@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Launcher script for Talk-to-Write
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ -f "$DIR/.venv/bin/python" ]; then
+    PYTHON="$DIR/.venv/bin/python"
+else
+    PYTHON="python3"
+fi
+
+exec "$PYTHON" -m talk_to_write "$@"

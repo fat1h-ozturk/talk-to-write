@@ -1,0 +1,277 @@
+"""
+Settings dialog for Talk-to-Write.
+Allows configuring API keys, AI providers, models, hotkeys, and custom vocabulary.
+"""
+
+from typing import Callable, Optional
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ..config import ConfigManager
+
+DARK_STYLE = """
+QDialog {
+    background-color: #18181b;
+    color: #f4f4f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+QGroupBox {
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    margin-top: 12px;
+    padding-top: 14px;
+    font-weight: bold;
+    color: #e4e4e7;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px;
+}
+QLabel {
+    color: #a1a1aa;
+    font-size: 13px;
+}
+QLineEdit, QComboBox, QTextEdit {
+    background-color: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #fafafa;
+    font-size: 13px;
+}
+QLineEdit:focus, QComboBox:focus, QTextEdit:focus {
+    border: 1px solid #6366f1;
+}
+QPushButton {
+    background-color: #3f3f46;
+    color: #f4f4f5;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 500;
+}
+QPushButton:hover {
+    background-color: #52525b;
+}
+QPushButton#primaryBtn {
+    background-color: #4f46e5;
+    color: #ffffff;
+}
+QPushButton#primaryBtn:hover {
+    background-color: #4338ca;
+}
+QCheckBox {
+    color: #d4d4d8;
+    spacing: 8px;
+}
+"""
+
+class SettingsDialog(QDialog):
+    """Settings modal window for configuring Talk-to-Write."""
+
+    config_updated = Signal()
+
+    def __init__(self, config: ConfigManager, parent=None):
+        super().__init__(parent)
+        self.config = config
+        self.setWindowTitle("Talk-to-Write Ayarları")
+        self.resize(520, 560)
+        self.setStyleSheet(DARK_STYLE)
+
+        self._build_ui()
+        self._load_values()
+
+    def _build_ui(self) -> None:
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(16)
+
+        # Title
+        title_label = QLabel("⚡ Talk-to-Write Ayarları")
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffffff;")
+        main_layout.addWidget(title_label)
+
+        # 1. AI Provider Group
+        ai_group = QGroupBox("Yapay Zeka & Model Sağlayıcısı")
+        ai_layout = QFormLayout(ai_group)
+        ai_layout.setSpacing(10)
+
+        self.provider_combo = QComboBox()
+        self.provider_combo.addItem("Google Gemini (Önerilen - Ücretsiz & Hızlı)", "gemini")
+        self.provider_combo.addItem("Groq Cloud (Whisper + Llama 3)", "groq")
+        self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        ai_layout.addRow("Sağlayıcı:", self.provider_combo)
+
+        # Gemini API Key
+        key_layout = QHBoxLayout()
+        self.gemini_key_edit = QLineEdit()
+        self.gemini_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.gemini_key_edit.setPlaceholderText("AIzaSy...")
+        self.toggle_key_btn = QPushButton("👁")
+        self.toggle_key_btn.setFixedWidth(36)
+        self.toggle_key_btn.clicked.connect(self._toggle_key_visibility)
+        key_layout.addWidget(self.gemini_key_edit)
+        key_layout.addWidget(self.toggle_key_btn)
+        self.gemini_key_label = QLabel("Gemini API Anahtarı:")
+        ai_layout.addRow(self.gemini_key_label, key_layout)
+
+        # Gemini Model
+        self.gemini_model_combo = QComboBox()
+        self.gemini_model_combo.addItems(["gemini-2.0-flash", "gemini-1.5-flash"])
+        self.gemini_model_label = QLabel("Gemini Modeli:")
+        ai_layout.addRow(self.gemini_model_label, self.gemini_model_combo)
+
+        # Groq API Key
+        self.groq_key_edit = QLineEdit()
+        self.groq_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.groq_key_edit.setPlaceholderText("gsk_...")
+        self.groq_key_label = QLabel("Groq API Anahtarı:")
+        ai_layout.addRow(self.groq_key_label, self.groq_key_edit)
+
+        main_layout.addWidget(ai_group)
+
+        # 2. Shortcut & Trigger Group
+        trigger_group = QGroupBox("Kısayol ve Tetikleyici")
+        trigger_layout = QFormLayout(trigger_group)
+        trigger_layout.setSpacing(8)
+
+        self.hotkey_edit = QLineEdit()
+        self.hotkey_edit.setPlaceholderText("Ctrl+Alt+Space")
+        trigger_layout.addRow("Genel Kısayol:", self.hotkey_edit)
+
+        info_lbl = QLabel(
+            "💡 <b>İpucu:</b> KDE Sistem Ayarları -> Kısayollar -> Yeni Komut ekleyerek "
+            "dilediğiniz tuş kombinasyonuna (örn: Meta+Space veya CapsLock) "
+            "<code>talk-to-write --toggle</code> atayabilirsiniz."
+        )
+        info_lbl.setWordWrap(True)
+        info_lbl.setStyleSheet("color: #71717a; font-size: 11px;")
+        trigger_layout.addRow(info_lbl)
+
+        main_layout.addWidget(trigger_group)
+
+        # 3. Custom Vocabulary
+        vocab_group = QGroupBox("Özel Kelime Dağarcığı (Custom Vocabulary)")
+        vocab_layout = QVBoxLayout(vocab_group)
+        vocab_info = QLabel("Sık kullandığınız isimler, teknik terimler ve kodlama kütüphaneleri (virgülle ayırın):")
+        vocab_info.setStyleSheet("color: #a1a1aa; font-size: 11px;")
+        self.vocab_edit = QLineEdit()
+        self.vocab_edit.setPlaceholderText("Örn: TalkToWrite, Gemini, PySide6, Docker, Kubernetes, Fatih")
+        vocab_layout.addWidget(vocab_info)
+        vocab_layout.addWidget(self.vocab_edit)
+        main_layout.addWidget(vocab_group)
+
+        # 4. Preferences Checkboxes
+        pref_layout = QHBoxLayout()
+        self.sound_check = QCheckBox("Ses Geri Bildirimi (Bip sesleri)")
+        self.restore_clip_check = QCheckBox("Panoyu Yapıştırma Sonrası Eski Haline Getir")
+        pref_layout.addWidget(self.sound_check)
+        pref_layout.addWidget(self.restore_clip_check)
+        main_layout.addLayout(pref_layout)
+
+        main_layout.addStretch()
+
+        # Bottom Buttons
+        btn_layout = QHBoxLayout()
+        self.test_paste_btn = QPushButton("📋 Metin Enjeksiyonunu Test Et")
+        self.test_paste_btn.clicked.connect(self._test_injection)
+
+        self.save_btn = QPushButton("Kaydet")
+        self.save_btn.setObjectName("primaryBtn")
+        self.save_btn.clicked.connect(self._save_and_close)
+
+        self.cancel_btn = QPushButton("Kapat")
+        self.cancel_btn.clicked.connect(self.reject)
+
+        btn_layout.addWidget(self.test_paste_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.cancel_btn)
+        btn_layout.addWidget(self.save_btn)
+        main_layout.addLayout(btn_layout)
+
+    def _on_provider_changed(self) -> None:
+        is_gemini = self.provider_combo.currentData() == "gemini"
+        self.gemini_key_label.setVisible(is_gemini)
+        self.gemini_key_edit.setVisible(is_gemini)
+        self.toggle_key_btn.setVisible(is_gemini)
+        self.gemini_model_label.setVisible(is_gemini)
+        self.gemini_model_combo.setVisible(is_gemini)
+
+        self.groq_key_label.setVisible(not is_gemini)
+        self.groq_key_edit.setVisible(not is_gemini)
+
+    def _toggle_key_visibility(self) -> None:
+        if self.gemini_key_edit.echoMode() == QLineEdit.EchoMode.Password:
+            self.gemini_key_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+        else:
+            self.gemini_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+
+    def _load_values(self) -> None:
+        provider = self.config.get("provider", "gemini")
+        idx = self.provider_combo.findData(provider)
+        if idx >= 0:
+            self.provider_combo.setCurrentIndex(idx)
+
+        self.gemini_key_edit.setText(self.config.get("gemini_api_key", ""))
+        self.gemini_model_combo.setCurrentText(self.config.get("gemini_model", "gemini-2.0-flash"))
+        self.groq_key_edit.setText(self.config.get("groq_api_key", ""))
+        self.hotkey_edit.setText(self.config.get("hotkey", "Ctrl+Alt+Space"))
+
+        vocab = self.config.get("custom_vocabulary", [])
+        self.vocab_edit.setText(", ".join(vocab))
+
+        self.sound_check.setChecked(self.config.get("sound_effects", True))
+        self.restore_clip_check.setChecked(self.config.get("restore_clipboard", False))
+
+        self._on_provider_changed()
+
+    def _save_and_close(self) -> None:
+        self.config.set("provider", self.provider_combo.currentData())
+        self.config.set("gemini_api_key", self.gemini_key_edit.text().strip())
+        self.config.set("gemini_model", self.gemini_model_combo.currentText().strip())
+        self.config.set("groq_api_key", self.groq_key_edit.text().strip())
+        self.config.set("hotkey", self.hotkey_edit.text().strip())
+
+        raw_vocab = self.vocab_edit.text().split(",")
+        vocab = [v.strip() for v in raw_vocab if v.strip()]
+        self.config.set("custom_vocabulary", vocab)
+
+        self.config.set("sound_effects", self.sound_check.isChecked())
+        self.config.set("restore_clipboard", self.restore_clip_check.isChecked())
+
+        self.config_updated.emit()
+        self.accept()
+
+    def _test_injection(self) -> None:
+        from ..injector import TextInjector
+        injector = TextInjector()
+        test_text = "🎉 Talk-to-Write başarıyla metin enjekte ediyor!"
+        success = injector.inject_text(test_text)
+        if success:
+            QMessageBox.information(
+                self,
+                "Test Başarılı",
+                "Metin panoya kopyalandı ve aktif pencereye yapıştırma simülasyonu gönderildi!"
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "Test Uyarısı",
+                "Metin panoya kopyalandı ancak otomatik Ctrl+V gönderilemedi.\nydotool servisinin çalıştığından emin olun."
+            )
