@@ -18,11 +18,11 @@ class GroqService:
         self,
         api_key: str,
         stt_model: str = "whisper-large-v3-turbo",
-        llm_model: str = "llama-3.3-70b-versatile"
+        llm_model: str = "qwen/qwen3.8-27b"
     ):
         self.api_key = api_key.strip() if api_key else ""
         self.stt_model = stt_model or "whisper-large-v3-turbo"
-        self.llm_model = llm_model or "llama-3.3-70b-versatile"
+        self.llm_model = llm_model or "qwen/qwen3.8-27b"
 
     def transcribe_and_format(
         self,
@@ -32,7 +32,7 @@ class GroqService:
         timeout: int = 25
     ) -> Tuple[str, float]:
         """
-        Transcribes audio with Groq Whisper and polishes text with Groq Llama 3.
+        Transcribes audio with Groq Whisper and polishes text with Groq LLM.
         Returns (formatted_text, total_latency_seconds).
         """
         if not self.api_key:
@@ -67,7 +67,7 @@ class GroqService:
         if not raw_transcript:
             return ("", round(time.time() - start_time, 2))
 
-        # 2. Step: Groq LLM Formatting
+        # 2. Step: Groq LLM Formatting (with fallback to raw transcript)
         system_prompt = build_system_prompt(mode=mode, custom_vocabulary=custom_vocabulary)
         chat_payload = {
             "model": self.llm_model,
@@ -81,19 +81,18 @@ class GroqService:
 
         try:
             chat_resp = requests.post(GROQ_CHAT_URL, headers=headers, json=chat_payload, timeout=timeout)
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"Groq LLM bağlantı hatası: {e}")
-
-        if chat_resp.status_code != 200:
-            raise RuntimeError(f"Groq LLM Hatası ({chat_resp.status_code}): {chat_resp.text[:200]}")
-
-        formatted_text = chat_resp.json()["choices"][0]["message"]["content"].strip()
-
-        # Clean markdown wrappers if any
-        if formatted_text.startswith("```") and formatted_text.endswith("```"):
-            lines = formatted_text.splitlines()
-            if len(lines) >= 2:
-                formatted_text = "\n".join(lines[1:-1]).strip()
+            if chat_resp.status_code == 200:
+                formatted_text = chat_resp.json()["choices"][0]["message"]["content"].strip()
+                if formatted_text.startswith("```") and formatted_text.endswith("```"):
+                    lines = formatted_text.splitlines()
+                    if len(lines) >= 2:
+                        formatted_text = "\n".join(lines[1:-1]).strip()
+            else:
+                print(f"[Groq] LLM formatting HTTP {chat_resp.status_code}, using raw transcript.")
+                formatted_text = raw_transcript
+        except Exception as e:
+            print(f"[Groq] LLM formatting error ({e}), using raw transcript.")
+            formatted_text = raw_transcript
 
         total_latency = round(time.time() - start_time, 2)
         return (formatted_text, total_latency)

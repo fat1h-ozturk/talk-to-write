@@ -12,7 +12,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "gemini_model": "gemini-2.0-flash",
     "groq_api_key": os.environ.get("GROQ_API_KEY", ""),
     "groq_stt_model": "whisper-large-v3-turbo",
-    "groq_llm_model": "llama-3.3-70b-versatile",
+    "groq_llm_model": "qwen/qwen3.8-27b",
     "mode": "dictation",  # "dictation", "chat", "email", "prompt", "bullets"
     "hotkey": "Ctrl+Alt+Space",
     "custom_vocabulary": ["TalkToWrite", "Gemini", "PySide6", "Wayland"],

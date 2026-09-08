@@ -9,4 +9,8 @@ else
     PYTHON="python3"
 fi
 
+if [ -f "/usr/lib64/libgtk4-layer-shell.so.0" ]; then
+    export LD_PRELOAD="/usr/lib64/libgtk4-layer-shell.so.0${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
+
 exec "$PYTHON" -m talk_to_write "$@"

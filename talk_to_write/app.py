@@ -3,6 +3,7 @@ Main Application Coordinator for Talk-to-Write.
 Connects Audio, AI Services, Text Injector, System Tray, Floating Pill, and Hotkeys.
 """
 
+import os
 import sys
 import threading
 from typing import Optional
@@ -16,6 +17,7 @@ from .injector import TextInjector
 from .services.gemini import GeminiService
 from .services.groq import GroqService
 from .sound import SoundPlayer
+from .ui.overlay_controller import LayerOverlayController
 from .ui.pill import FloatingPill
 from .ui.settings import SettingsDialog
 from .ui.tray import TrayIcon
@@ -48,10 +50,14 @@ class TalkToWriteApp:
             on_level_callback=lambda lvl: self.signals.level_changed.emit(lvl)
         )
 
-        # UI Components
-        self.pill = FloatingPill()
-        self.pill.clicked.connect(self.toggle_recording)
-        self.pill.set_mode(self.config.get("mode", "dictation"))
+        # UI Components: Use Wayland Layer Shell overlay (guarantees zero focus loss) if available
+        if os.environ.get("XDG_SESSION_TYPE") == "wayland" and os.path.exists("/usr/lib64/libgtk4-layer-shell.so.0"):
+            self.pill = LayerOverlayController()
+            self.pill.set_mode(self.config.get("mode", "dictation"))
+        else:
+            self.pill = FloatingPill()
+            self.pill.clicked.connect(self.toggle_recording)
+            self.pill.set_mode(self.config.get("mode", "dictation"))
 
         self.tray = TrayIcon()
         self.tray.set_active_mode(self.config.get("mode", "dictation"))
@@ -188,6 +194,8 @@ class TalkToWriteApp:
 
     def quit(self) -> None:
         self.hotkey_mgr.stop()
+        if hasattr(self.pill, "close"):
+            self.pill.close()
         if self.recorder.is_recording:
             self.recorder.stop_recording()
         self.q_app.quit()
