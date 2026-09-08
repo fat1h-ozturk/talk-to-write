@@ -27,14 +27,16 @@ class FloatingPill(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # Window styling
+        # Window styling: Never steal focus, stay on top, transparent background
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool
+            | Qt.WindowType.WindowDoesNotAcceptFocus
+            | Qt.WindowType.BypassWindowManagerHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # Drop shadow for depth
         shadow = QGraphicsDropShadowEffect(self)
@@ -92,6 +94,7 @@ class FloatingPill(QWidget):
         self.mode = mode
         self.status_message = "Dinleniyor..."
         self.show()
+        self.raise_()
         self.update()
 
     def show_processing(self) -> None:
@@ -99,6 +102,7 @@ class FloatingPill(QWidget):
         self.state = "processing"
         self.status_message = "Dönüştürülüyor..."
         self.show()
+        self.raise_()
         self.update()
 
     def show_success(self, latency: float = 0.0) -> None:
@@ -108,6 +112,7 @@ class FloatingPill(QWidget):
         else:
             self.status_message = "Yapıştırıldı!"
         self.show()
+        self.raise_()
         self.update()
         self._hide_timer.start(1600)
 
@@ -115,6 +120,7 @@ class FloatingPill(QWidget):
         self.state = "error"
         self.status_message = message[:28] + ("..." if len(message) > 28 else "")
         self.show()
+        self.raise_()
         self.update()
         self._hide_timer.start(3500)
 

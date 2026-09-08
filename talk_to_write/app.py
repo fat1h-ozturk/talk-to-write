@@ -75,23 +75,28 @@ class TalkToWriteApp:
     def toggle_recording(self) -> None:
         """Toggles between starting audio capture and sending to AI."""
         if self.is_busy_processing:
+            print("[App] Henüz önceki işlem devam ediyor, bekleniyor...")
             return
 
         if not self.recorder.is_recording:
             # START RECORDING
             current_mode = self.config.get("mode", "dictation")
+            print(f"[App] Kayıt başladı (Mod: {current_mode})")
             self.sound.play("start")
             self.pill.show_recording(mode=current_mode)
             self.tray.set_recording(True)
             self.recorder.start_recording()
         else:
             # STOP RECORDING & PROCESS
+            print("[App] Kayıt durduruldu, ses işleniyor...")
             self.sound.play("stop")
             self.pill.show_processing()
             self.tray.set_recording(False)
             audio_bytes = self.recorder.stop_recording()
 
             if not audio_bytes or len(audio_bytes) < 3200:  # < 0.1s
+                print("[App] Çok kısa ses veya ses algılanamadı.")
+                self.sound.play("error")
                 self.pill.show_error("Ses algılanamadı.")
                 return
 
@@ -105,6 +110,7 @@ class TalkToWriteApp:
         custom_vocab = self.config.get("custom_vocabulary", [])
 
         try:
+            print(f"[App] {provider.upper()} API isteği gönderiliyor ({len(audio_bytes)} bayt)...")
             if provider == "gemini":
                 api_key = self.config.get("gemini_api_key", "")
                 model = self.config.get("gemini_model", "gemini-2.0-flash")
@@ -122,18 +128,26 @@ class TalkToWriteApp:
                 )
 
             if not text.strip():
+                print("[App] AI boş yanıt döndürdü.")
                 self.signals.processing_error.emit("Boş yanıt veya ses anlaşılmadı.")
                 return
 
+            print(f"[App] Metin alındı ({latency}s): {text[:60]}...")
+
             # Inject text into active window
             success = self.injector.inject_text(text)
-            if not success:
-                print(f"[App] Text injected into clipboard (automatic paste failed): {text[:50]}")
+            if success:
+                print("[App] Metin aktif pencereye başarıyla yapıştırıldı!")
+            else:
+                print(f"[App] Metin panoya kopyalandı (Ctrl+V ydotool gönderilemedi)")
 
             self.signals.processing_done.emit(text, latency)
 
         except Exception as e:
+            print(f"[App] Hata oluştu: {e}")
             self.signals.processing_error.emit(str(e))
+        finally:
+            self.is_busy_processing = False
 
     def _on_audio_level(self, level: float) -> None:
         if self.recorder.is_recording:
