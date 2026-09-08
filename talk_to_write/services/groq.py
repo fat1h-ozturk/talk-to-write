@@ -29,6 +29,7 @@ class GroqService:
         audio_bytes: bytes,
         mode: str = "dictation",
         custom_vocabulary: Optional[List[str]] = None,
+        language: str = "tr",
         timeout: int = 25
     ) -> Tuple[str, float]:
         """
@@ -44,16 +45,25 @@ class GroqService:
         start_time = time.time()
         headers = {"Authorization": f"Bearer {self.api_key}"}
 
-        # 1. Step: Groq Whisper Transcription
+        # 1. Step: Groq Whisper Transcription with Turkish Priming & Greedy Decoding
         files = {
             "file": ("audio.wav", audio_bytes, "audio/wav")
         }
         data = {
             "model": self.stt_model,
-            "response_format": "json"
+            "response_format": "json",
+            "temperature": "0.0",
         }
+        if language and language.lower() not in ("auto", ""):
+            data["language"] = language.lower()
+        else:
+            data["language"] = "tr"
+
+        # Prime Whisper context for proper capitalization, Turkish punctuation & vocab
+        whisper_priming = "Merhaba. Bu bir Türkçe konuşma diktesidir; noktalama işaretleri ve büyük harfler içerir."
         if custom_vocabulary:
-            data["prompt"] = ", ".join(custom_vocabulary)
+            whisper_priming += " Terimler: " + ", ".join(custom_vocabulary)
+        data["prompt"] = whisper_priming
 
         try:
             stt_resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, data=data, timeout=timeout)
@@ -64,6 +74,7 @@ class GroqService:
             raise RuntimeError(f"Groq Whisper Hatası ({stt_resp.status_code}): {stt_resp.text[:200]}")
 
         raw_transcript = stt_resp.json().get("text", "").strip()
+        print(f"[STT Ham Çıktı]: {raw_transcript}")
         if not raw_transcript:
             return ("", round(time.time() - start_time, 2))
 

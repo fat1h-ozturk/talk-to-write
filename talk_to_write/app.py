@@ -127,10 +127,11 @@ class TalkToWriteApp:
             else:
                 api_key = self.config.get("groq_api_key", "")
                 stt_model = self.config.get("groq_stt_model", "whisper-large-v3-turbo")
-                llm_model = self.config.get("groq_llm_model", "llama-3.3-70b-versatile")
+                llm_model = self.config.get("groq_llm_model", "qwen/qwen3.8-27b")
+                lang = self.config.get("language", "tr")
                 service = GroqService(api_key=api_key, stt_model=stt_model, llm_model=llm_model)
                 text, latency = service.transcribe_and_format(
-                    audio_bytes, mode=mode, custom_vocabulary=custom_vocab
+                    audio_bytes, mode=mode, custom_vocabulary=custom_vocab, language=lang
                 )
 
             if not text.strip():

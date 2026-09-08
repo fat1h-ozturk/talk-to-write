@@ -135,16 +135,35 @@ class AudioRecorder:
         except Exception:
             pass
 
+    def _normalize_pcm(self, raw_bytes: bytes, target_peak: int = 24000) -> bytes:
+        """Normalizes audio volume so quiet microphones are loud and clear for STT models."""
+        if not raw_bytes:
+            return raw_bytes
+        count = len(raw_bytes) // 2
+        try:
+            samples = struct.unpack(f"<{count}h", raw_bytes)
+            peak = max(abs(s) for s in samples) if samples else 0
+            if peak > 80 and peak < target_peak:
+                gain = min(8.0, target_peak / peak)
+                norm_samples = [max(-32768, min(32767, int(s * gain))) for s in samples]
+                return struct.pack(f"<{count}h", *norm_samples)
+        except Exception:
+            pass
+        return raw_bytes
+
     def _encode_wav(self, frames: list) -> bytes:
-        """Encodes raw PCM frames into a valid RIFF WAV container."""
+        """Encodes raw PCM frames into a valid RIFF WAV container with volume normalization."""
         if not frames:
             return b""
+
+        raw_pcm = b"".join(frames)
+        normalized_pcm = self._normalize_pcm(raw_pcm)
 
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wf:
             wf.setnchannels(self.CHANNELS)
             wf.setsampwidth(2)  # 16-bit
             wf.setframerate(self.SAMPLE_RATE)
-            wf.writeframes(b"".join(frames))
+            wf.writeframes(normalized_pcm)
 
         return buf.getvalue()
