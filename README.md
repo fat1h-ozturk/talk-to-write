@@ -167,8 +167,3 @@ Kodların ve bağımlılıkların sisteminizde eksiksiz çalıştığını doğr
 - **Soru: Sesim çok kısık algılanıyor.**
   - **Çözüm:** Uygulama içerisinde otomatik kazanç artırımı (volume normalization) aktiftir, ancak KDE/GNOME Sistem Ses Ayarlarından mikrofon giriş seviyenizin en az %50 olduğundan emin olun.
 
----
-
-## 📄 Lisans
-
-Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır. Katkıda bulunmaktan ve geliştirmekten çekinmeyin!
