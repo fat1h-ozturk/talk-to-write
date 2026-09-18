@@ -16,6 +16,7 @@ GÖREVLERİN:
 5. Yanlış söylenen veya peş peşe tekrarlanan kelimeleri (kekeleme/düzeltme) pürüzsüz hale getir.
 6. Anlamı ASLA bozma, fazladan fikir veya yorum ekleme.
 7. ASLA sohbet etme. Çıktıda 'İşte metniniz:', 'Düzenlenmiş hali:' gibi hiçbir giriş veya açıklama CÜMLESİ BULUNMAMALIDIR. SADECE NİHAİ DÜZENLENMİŞ METNİ DÖNDÜR.
+8. Eğer gelen ses kaydında veya ham metinde anlaşılır bir konuşma yoksa, sadece sessizlik, nefes sesi, öksürük veya arka plan gürültüsü varsa, KESİNLİKLE hiçbir şey yazma — sadece boş bir yanıt döndür.
 """
 
 MODE_PROMPTS = {

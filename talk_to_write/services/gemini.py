@@ -11,12 +11,24 @@ from ..prompts import build_system_prompt
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
+_LLM_PREFIX_PATTERNS = [
+    "İşte metniniz:",
+    "İşte düzeltilmiş metin:",
+    "İşte düzenlenmiş metin:",
+    "Düzenlenmiş hali:",
+    "Düzeltilmiş hali:",
+    "Düzeltilmiş metin:",
+    "İşte:",
+]
+
+
 class GeminiService:
     """Service for processing audio into polished text using Gemini Multimodal models."""
 
     def __init__(self, api_key: str, model: str = "gemini-2.0-flash"):
         self.api_key = api_key.strip() if api_key else ""
         self.model = model or "gemini-2.0-flash"
+        self._session = requests.Session()
 
     def transcribe_and_format(
         self,
@@ -39,7 +51,10 @@ class GeminiService:
         prompt = build_system_prompt(mode=mode, custom_vocabulary=custom_vocabulary)
 
         url = f"{GEMINI_API_URL.format(model=self.model)}?key={self.api_key}"
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": self.api_key
+        }
 
         payload = {
             "contents": [
@@ -62,7 +77,7 @@ class GeminiService:
         }
 
         try:
-            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            resp = self._session.post(url, json=payload, headers=headers, timeout=timeout)
         except requests.exceptions.Timeout:
             raise RuntimeError("Gemini API zaman aşımına uğradı (Timeout). Lütfen internet bağlantınızı kontrol edin.")
         except requests.exceptions.RequestException as e:
@@ -103,6 +118,12 @@ class GeminiService:
             # Strip leading/trailing quotation marks if whole text was quoted
             if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
                 text = text[1:-1].strip()
+
+            # Strip conversational LLM prefixes
+            for prefix in _LLM_PREFIX_PATTERNS:
+                if text.startswith(prefix):
+                    text = text[len(prefix):].strip()
+                    break
 
             return (text, latency)
         except Exception as e:

@@ -151,6 +151,28 @@ class SettingsDialog(QDialog):
         self.groq_key_label = QLabel("Groq API Anahtarı:")
         ai_layout.addRow(self.groq_key_label, self.groq_key_edit)
 
+        # Groq STT Model
+        self.groq_stt_combo = QComboBox()
+        self.groq_stt_combo.addItem("whisper-large-v3 (En Yüksek Doğruluk - Önerilen)", "whisper-large-v3")
+        self.groq_stt_combo.addItem("whisper-large-v3-turbo (Ultra Hızlı)", "whisper-large-v3-turbo")
+        self.groq_stt_label = QLabel("Groq STT (Ses) Modeli:")
+        ai_layout.addRow(self.groq_stt_label, self.groq_stt_combo)
+
+        # Groq LLM Model
+        self.groq_llm_combo = QComboBox()
+        self.groq_llm_combo.addItem("qwen/qwen3.8-27b (Qwen 3.8 27B - Önerilen)", "qwen/qwen3.8-27b")
+        self.groq_llm_combo.addItem("llama-3.3-70b-versatile (Meta Llama 3.3 70B)", "llama-3.3-70b-versatile")
+        self.groq_llm_label = QLabel("Groq LLM (Metin) Modeli:")
+        ai_layout.addRow(self.groq_llm_label, self.groq_llm_combo)
+
+        # Language selection
+        self.language_combo = QComboBox()
+        self.language_combo.addItem("Otomatik Algıla (Auto)", "auto")
+        self.language_combo.addItem("Türkçe (tr)", "tr")
+        self.language_combo.addItem("İngilizce (en)", "en")
+        self.language_label = QLabel("Konuşma Dili:")
+        ai_layout.addRow(self.language_label, self.language_combo)
+
         main_layout.addWidget(ai_group)
 
         # 2. Shortcut & Trigger Group
@@ -245,6 +267,10 @@ class SettingsDialog(QDialog):
 
         self.groq_key_label.setVisible(not is_gemini)
         self.groq_key_edit.setVisible(not is_gemini)
+        self.groq_stt_label.setVisible(not is_gemini)
+        self.groq_stt_combo.setVisible(not is_gemini)
+        self.groq_llm_label.setVisible(not is_gemini)
+        self.groq_llm_combo.setVisible(not is_gemini)
 
     def _toggle_key_visibility(self) -> None:
         if self.gemini_key_edit.echoMode() == QLineEdit.EchoMode.Password:
@@ -284,6 +310,22 @@ class SettingsDialog(QDialog):
         self.gemini_key_edit.setText(self.config.get("gemini_api_key", ""))
         self.gemini_model_combo.setCurrentText(self.config.get("gemini_model", "gemini-2.0-flash"))
         self.groq_key_edit.setText(self.config.get("groq_api_key", ""))
+
+        stt_model = self.config.get("groq_stt_model", "whisper-large-v3-turbo")
+        stt_idx = self.groq_stt_combo.findData(stt_model)
+        if stt_idx >= 0:
+            self.groq_stt_combo.setCurrentIndex(stt_idx)
+
+        llm_model = self.config.get("groq_llm_model", "qwen/qwen3.8-27b")
+        llm_idx = self.groq_llm_combo.findData(llm_model)
+        if llm_idx >= 0:
+            self.groq_llm_combo.setCurrentIndex(llm_idx)
+
+        lang = self.config.get("language", "auto")
+        lang_idx = self.language_combo.findData(lang)
+        if lang_idx >= 0:
+            self.language_combo.setCurrentIndex(lang_idx)
+
         self.hotkey_edit.setText(self.config.get("hotkey", "Ctrl+Alt+Space"))
 
         vocab = self.config.get("custom_vocabulary", [])
@@ -304,6 +346,9 @@ class SettingsDialog(QDialog):
         self.config.set("gemini_api_key", self.gemini_key_edit.text().strip())
         self.config.set("gemini_model", self.gemini_model_combo.currentText().strip())
         self.config.set("groq_api_key", self.groq_key_edit.text().strip())
+        self.config.set("groq_stt_model", self.groq_stt_combo.currentData())
+        self.config.set("groq_llm_model", self.groq_llm_combo.currentData())
+        self.config.set("language", self.language_combo.currentData())
         self.config.set("hotkey", self.hotkey_edit.text().strip())
 
         raw_vocab = self.vocab_edit.text().split(",")

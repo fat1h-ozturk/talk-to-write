@@ -84,6 +84,32 @@ class TalkToWriteApp:
 
         self.is_busy_processing = False
 
+        # Lazy-initialized AI service singletons (avoids re-creating per request)
+        self._gemini_service: Optional[GeminiService] = None
+        self._groq_service: Optional[GroqService] = None
+
+    def _get_gemini_service(self) -> GeminiService:
+        """Returns a cached GeminiService, recreating only if config changed."""
+        api_key = self.config.get("gemini_api_key", "")
+        model = self.config.get("gemini_model", "gemini-2.0-flash")
+        if self._gemini_service is None or \
+           self._gemini_service.api_key != api_key.strip() or \
+           self._gemini_service.model != model:
+            self._gemini_service = GeminiService(api_key=api_key, model=model)
+        return self._gemini_service
+
+    def _get_groq_service(self) -> GroqService:
+        """Returns a cached GroqService, recreating only if config changed."""
+        api_key = self.config.get("groq_api_key", "")
+        stt_model = self.config.get("groq_stt_model", "whisper-large-v3-turbo")
+        llm_model = self.config.get("groq_llm_model", "qwen/qwen3.8-27b")
+        if self._groq_service is None or \
+           self._groq_service.api_key != api_key.strip() or \
+           self._groq_service.stt_model != stt_model or \
+           self._groq_service.llm_model != llm_model:
+            self._groq_service = GroqService(api_key=api_key, stt_model=stt_model, llm_model=llm_model)
+        return self._groq_service
+
     def toggle_recording(self) -> None:
         """Toggles between starting audio capture and sending to AI."""
         if self.is_busy_processing:
@@ -124,18 +150,13 @@ class TalkToWriteApp:
         try:
             print(f"[App] {provider.upper()} API isteği gönderiliyor ({len(audio_bytes)} bayt)...")
             if provider == "gemini":
-                api_key = self.config.get("gemini_api_key", "")
-                model = self.config.get("gemini_model", "gemini-2.0-flash")
-                service = GeminiService(api_key=api_key, model=model)
+                service = self._get_gemini_service()
                 text, latency = service.transcribe_and_format(
                     audio_bytes, mode=mode, custom_vocabulary=custom_vocab
                 )
             else:
-                api_key = self.config.get("groq_api_key", "")
-                stt_model = self.config.get("groq_stt_model", "whisper-large-v3-turbo")
-                llm_model = self.config.get("groq_llm_model", "qwen/qwen3.8-27b")
                 lang = self.config.get("language", "tr")
-                service = GroqService(api_key=api_key, stt_model=stt_model, llm_model=llm_model)
+                service = self._get_groq_service()
                 text, latency = service.transcribe_and_format(
                     audio_bytes, mode=mode, custom_vocabulary=custom_vocab, language=lang
                 )
@@ -200,6 +221,9 @@ class TalkToWriteApp:
     def _on_config_updated(self) -> None:
         self.sound.enabled = self.config.get("sound_effects", True)
         self.injector.restore_clipboard = self.config.get("restore_clipboard", False)
+        # Invalidate cached services so they pick up new config on next use
+        self._gemini_service = None
+        self._groq_service = None
         # Refresh hotkey manager
         self.hotkey_mgr.stop()
         self.hotkey_mgr = HotkeyManager(
@@ -216,4 +240,5 @@ class TalkToWriteApp:
             self.pill.close()
         if self.recorder.is_recording:
             self.recorder.stop_recording()
+        self.recorder.terminate()
         self.q_app.quit()

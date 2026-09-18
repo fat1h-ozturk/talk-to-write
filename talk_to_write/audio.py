@@ -1,6 +1,7 @@
 """
 Audio capture engine for Talk-to-Write.
 Captures 16kHz 16-bit mono PCM audio in memory and reports real-time audio volume levels.
+Includes WebRTC VAD (Voice Activity Detection) silence trimming and peak audio normalization.
 """
 
 import contextlib
@@ -15,6 +16,13 @@ import time
 import wave
 from typing import Callable, Optional
 import pyaudio
+
+try:
+    import webrtcvad
+    _HAS_WEBRTC_VAD = True
+except ImportError:
+    _HAS_WEBRTC_VAD = False
+
 
 # Suppress ALSA C-level error spam on Linux only
 @contextlib.contextmanager
@@ -35,7 +43,7 @@ def no_alsa_err():
 
 
 class AudioRecorder:
-    """Manages audio capture with real-time level metering."""
+    """Manages audio capture with real-time level metering, warm device caching, and VAD."""
 
     SAMPLE_RATE = 16000
     CHANNELS = 1
@@ -50,6 +58,19 @@ class AudioRecorder:
         self._lock = threading.Lock()
         self._pyaudio: Optional[pyaudio.PyAudio] = None
         self._stream: Optional[pyaudio.Stream] = None
+        self._vad = webrtcvad.Vad(2) if _HAS_WEBRTC_VAD else None
+        # Warm-up PyAudio once on initialization to eliminate ALSA probe latency
+        self._ensure_pyaudio()
+
+    def _ensure_pyaudio(self) -> Optional[pyaudio.PyAudio]:
+        """Ensures PyAudio instance is warm and ready without device re-probing."""
+        if self._pyaudio is None:
+            try:
+                with no_alsa_err():
+                    self._pyaudio = pyaudio.PyAudio()
+            except Exception as e:
+                print(f"[Audio] PyAudio init error: {e}")
+        return self._pyaudio
 
     def start_recording(self) -> None:
         """Starts capturing audio in a background thread."""
@@ -80,9 +101,12 @@ class AudioRecorder:
 
     def _record_loop(self) -> None:
         try:
+            pa = self._ensure_pyaudio()
+            if not pa:
+                return
+
             with no_alsa_err():
-                self._pyaudio = pyaudio.PyAudio()
-                self._stream = self._pyaudio.open(
+                self._stream = pa.open(
                     format=self.FORMAT,
                     channels=self.CHANNELS,
                     rate=self.SAMPLE_RATE,
@@ -117,9 +141,10 @@ class AudioRecorder:
         except Exception as e:
             print(f"[Audio] Stream initialization error: {e}")
         finally:
-            self._cleanup()
+            self._cleanup_stream()
 
-    def _cleanup(self) -> None:
+    def _cleanup_stream(self) -> None:
+        """Closes the current recording stream while keeping PyAudio warm."""
         try:
             if self._stream:
                 self._stream.stop_stream()
@@ -128,12 +153,73 @@ class AudioRecorder:
         except Exception:
             pass
 
+    def terminate(self) -> None:
+        """Fully terminates PyAudio on application exit."""
+        self._cleanup_stream()
         try:
             if self._pyaudio:
                 self._pyaudio.terminate()
                 self._pyaudio = None
         except Exception:
             pass
+
+    def _trim_silence_vad(self, raw_pcm: bytes, padding_ms: int = 300) -> bytes:
+        """
+        Uses WebRTC VAD to trim dead silence from beginning and end of recording.
+        Adds padding_ms of audio before and after speech to ensure no consonants are cut.
+        Returns empty bytes if no speech was detected anywhere in the recording.
+        """
+        if not raw_pcm or not self._vad:
+            return raw_pcm
+
+        frame_duration_ms = 30  # WebRTC VAD supports 10, 20, or 30ms frames
+        frame_size = int(self.SAMPLE_RATE * (frame_duration_ms / 1000.0) * 2)  # 960 bytes
+        total_frames = len(raw_pcm) // frame_size
+        if total_frames == 0:
+            return raw_pcm
+
+        speech_flags = []
+        for i in range(total_frames):
+            frame = raw_pcm[i * frame_size : (i + 1) * frame_size]
+            try:
+                is_speech = self._vad.is_speech(frame, self.SAMPLE_RATE)
+            except Exception:
+                is_speech = True  # In case of VAD edge cases, err on the side of speech
+            speech_flags.append(is_speech)
+
+        if not any(speech_flags):
+            print("[Audio] VAD: Kayıtta herhangi bir insan sesi algılanamadı.")
+            return b""
+
+        first_speech_idx = speech_flags.index(True)
+        last_speech_idx = len(speech_flags) - 1 - speech_flags[::-1].index(True)
+
+        padding_frames = int(padding_ms / frame_duration_ms)
+        start_frame = max(0, first_speech_idx - padding_frames)
+        end_frame = min(total_frames, last_speech_idx + 1 + padding_frames)
+
+        start_byte = start_frame * frame_size
+        end_byte = min(len(raw_pcm), end_frame * frame_size)
+        trimmed = raw_pcm[start_byte:end_byte]
+        
+        saved_sec = (len(raw_pcm) - len(trimmed)) / (self.SAMPLE_RATE * 2)
+        if saved_sec > 0.2:
+            print(f"[Audio] VAD: {saved_sec:.2f}s sessizlik budandı ({len(trimmed)}/{len(raw_pcm)} bayt).")
+        return trimmed
+
+    def _compute_rms(self, raw_bytes: bytes) -> float:
+        """Computes Root Mean Square (RMS) audio level of PCM data (0.0 to 1.0)."""
+        if not raw_bytes:
+            return 0.0
+        count = len(raw_bytes) // 2
+        try:
+            samples = struct.unpack(f"<{count}h", raw_bytes)
+            if not samples:
+                return 0.0
+            sum_sq = sum(s * s for s in samples)
+            return math.sqrt(sum_sq / len(samples)) / 32768.0
+        except Exception:
+            return 0.0
 
     def _normalize_pcm(self, raw_bytes: bytes, target_peak: int = 24000) -> bytes:
         """Normalizes audio volume so quiet microphones are loud and clear for STT models."""
@@ -144,7 +230,8 @@ class AudioRecorder:
             samples = struct.unpack(f"<{count}h", raw_bytes)
             peak = max(abs(s) for s in samples) if samples else 0
             if peak > 80 and peak < target_peak:
-                gain = min(8.0, target_peak / peak)
+                # Limit max gain to 4.0x to avoid over-amplifying low background hiss
+                gain = min(4.0, target_peak / peak)
                 norm_samples = [max(-32768, min(32767, int(s * gain))) for s in samples]
                 return struct.pack(f"<{count}h", *norm_samples)
         except Exception:
@@ -152,12 +239,30 @@ class AudioRecorder:
         return raw_bytes
 
     def _encode_wav(self, frames: list) -> bytes:
-        """Encodes raw PCM frames into a valid RIFF WAV container with volume normalization."""
+        """
+        Trims silence via VAD, checks minimum RMS noise floor,
+        normalizes peak speech volume, and encodes into RIFF WAV.
+        """
         if not frames:
             return b""
 
         raw_pcm = b"".join(frames)
-        normalized_pcm = self._normalize_pcm(raw_pcm)
+        if len(raw_pcm) < 3200:  # < 0.1s
+            return b""
+
+        # 1. WebRTC VAD Silence Trimming (lead-in & lead-out dead silence removal)
+        speech_pcm = self._trim_silence_vad(raw_pcm)
+        if not speech_pcm:
+            return b""
+
+        # 2. RMS-based noise floor check
+        rms = self._compute_rms(speech_pcm)
+        if rms < 0.005:  # ~-46 dBFS threshold
+            print(f"[Audio] RMS {rms:.4f} ses eşiğinin altında, atlanıyor.")
+            return b""
+
+        # 3. Peak volume normalization on actual speech
+        normalized_pcm = self._normalize_pcm(speech_pcm)
 
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wf:

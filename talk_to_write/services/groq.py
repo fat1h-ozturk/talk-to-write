@@ -1,7 +1,9 @@
 """
-Groq Whisper STT + Llama 3 LLM Formatter Service.
+Groq Whisper STT + LLM Formatter Service.
+Two-stage pipeline: Whisper transcription → LLM text correction/formatting.
 """
 
+import re
 import time
 from typing import List, Optional, Tuple
 import requests
@@ -11,8 +13,55 @@ from ..prompts import build_system_prompt
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 
+# Pre-compiled patterns for LLM output cleaning
+_THINK_TAG_RE = re.compile(r"<think>.*?</think>", flags=re.DOTALL)
+_LLM_PREFIX_PATTERNS = [
+    "İşte metniniz:",
+    "İşte düzeltilmiş metin:",
+    "İşte düzenlenmiş metin:",
+    "Düzenlenmiş hali:",
+    "Düzeltilmiş hali:",
+    "Düzeltilmiş metin:",
+    "İşte:",
+]
+
+
+def _clean_llm_output(text: str) -> str:
+    """
+    Cleans common LLM artifacts from the formatted text output:
+    1. Removes <think>...</think> blocks (Qwen reasoning mode leakage)
+    2. Strips markdown code fences (```...```)
+    3. Removes wrapping quotation marks
+    4. Removes conversational LLM prefixes
+    """
+    if not text:
+        return text
+
+    # 1. Strip <think>...</think> reasoning blocks
+    text = _THINK_TAG_RE.sub("", text).strip()
+
+    # 2. Strip markdown code fences
+    if text.startswith("```") and text.endswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 2:
+            text = "\n".join(lines[1:-1]).strip()
+
+    # 3. Strip wrapping quotation marks
+    if len(text) >= 2:
+        if (text[0] == '"' and text[-1] == '"') or (text[0] == "'" and text[-1] == "'"):
+            text = text[1:-1].strip()
+
+    # 4. Strip conversational LLM prefixes
+    for prefix in _LLM_PREFIX_PATTERNS:
+        if text.startswith(prefix):
+            text = text[len(prefix):].strip()
+            break
+
+    return text
+
+
 class GroqService:
-    """Service utilizing Groq Whisper for ultra-fast STT and Llama 3 for formatting."""
+    """Service utilizing Groq Whisper for ultra-fast STT and LLM for formatting."""
 
     def __init__(
         self,
@@ -23,6 +72,9 @@ class GroqService:
         self.api_key = api_key.strip() if api_key else ""
         self.stt_model = stt_model or "whisper-large-v3-turbo"
         self.llm_model = llm_model or "qwen/qwen3.8-27b"
+        # Persistent HTTP session for connection reuse (avoids repeated TCP/TLS handshakes)
+        self._session = requests.Session()
+        self._session.headers.update({"Authorization": f"Bearer {self.api_key}"})
 
     def transcribe_and_format(
         self,
@@ -43,9 +95,8 @@ class GroqService:
             )
 
         start_time = time.time()
-        headers = {"Authorization": f"Bearer {self.api_key}"}
 
-        # 1. Step: Groq Whisper Transcription with Turkish Priming & Greedy Decoding
+        # ── Step 1: Groq Whisper Transcription ──
         files = {
             "file": ("audio.wav", audio_bytes, "audio/wav")
         }
@@ -54,10 +105,12 @@ class GroqService:
             "response_format": "json",
             "temperature": "0.0",
         }
-        if language and language.lower() not in ("auto", ""):
-            data["language"] = language.lower()
-        else:
-            data["language"] = "tr"
+
+        # Language handling: "auto" → omit language param for Whisper auto-detection
+        # Explicit language codes (e.g. "tr", "en") → pass directly
+        lang_lower = (language or "").lower().strip()
+        if lang_lower and lang_lower not in ("auto", ""):
+            data["language"] = lang_lower
 
         # Prime Whisper context for proper capitalization, Turkish punctuation & vocab
         whisper_priming = "Merhaba. Bu bir Türkçe konuşma diktesidir; noktalama işaretleri ve büyük harfler içerir."
@@ -66,7 +119,7 @@ class GroqService:
         data["prompt"] = whisper_priming
 
         try:
-            stt_resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, data=data, timeout=timeout)
+            stt_resp = self._session.post(GROQ_AUDIO_URL, files=files, data=data, timeout=timeout)
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"Groq Whisper bağlantı hatası: {e}")
 
@@ -78,7 +131,7 @@ class GroqService:
         if not raw_transcript:
             return ("", round(time.time() - start_time, 2))
 
-        # 2. Step: Groq LLM Formatting (with fallback to raw transcript)
+        # ── Step 2: Groq LLM Formatting ──
         system_prompt = build_system_prompt(mode=mode, custom_vocabulary=custom_vocabulary)
         chat_payload = {
             "model": self.llm_model,
@@ -88,21 +141,26 @@ class GroqService:
             ],
             "temperature": 0.1,
             "max_tokens": 2048,
+            # Disable Qwen thinking mode — all tokens should go to the corrected text
+            "reasoning_format": "hidden",
+            "reasoning_effort": "none",
         }
 
         try:
-            chat_resp = requests.post(GROQ_CHAT_URL, headers=headers, json=chat_payload, timeout=timeout)
+            chat_resp = self._session.post(GROQ_CHAT_URL, json=chat_payload, timeout=timeout)
             if chat_resp.status_code == 200:
-                formatted_text = chat_resp.json()["choices"][0]["message"]["content"].strip()
-                if formatted_text.startswith("```") and formatted_text.endswith("```"):
-                    lines = formatted_text.splitlines()
-                    if len(lines) >= 2:
-                        formatted_text = "\n".join(lines[1:-1]).strip()
+                raw_output = chat_resp.json()["choices"][0]["message"]["content"].strip()
+                formatted_text = _clean_llm_output(raw_output)
+                print(f"[LLM Düzeltilmiş]: {formatted_text[:80]}...")
             else:
                 print(f"[Groq] LLM formatting HTTP {chat_resp.status_code}, using raw transcript.")
                 formatted_text = raw_transcript
         except Exception as e:
             print(f"[Groq] LLM formatting error ({e}), using raw transcript.")
+            formatted_text = raw_transcript
+
+        # Final safety: if LLM returned empty after cleaning, fall back to raw
+        if not formatted_text.strip():
             formatted_text = raw_transcript
 
         total_latency = round(time.time() - start_time, 2)
