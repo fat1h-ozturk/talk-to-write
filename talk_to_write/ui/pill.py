@@ -5,6 +5,7 @@ Renders an animated, draggable, glassmorphic pill widget indicating recording, a
 
 import math
 import random
+import sys
 from typing import Optional
 from PySide6.QtCore import QPoint, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
@@ -27,16 +28,46 @@ class FloatingPill(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # Window styling: Never steal focus, stay on top, transparent background
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.WindowDoesNotAcceptFocus
-            | Qt.WindowType.BypassWindowManagerHint
-        )
+        # Platform-specific non-activating window flags
+        if sys.platform.startswith("win"):
+            flags = (
+                Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint
+                | Qt.WindowType.Tool
+                | Qt.WindowType.WindowDoesNotAcceptFocus
+            )
+        elif sys.platform == "darwin":
+            flags = (
+                Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint
+                | Qt.WindowType.ToolTip
+                | Qt.WindowType.WindowDoesNotAcceptFocus
+            )
+        else:
+            flags = (
+                Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint
+                | Qt.WindowType.WindowDoesNotAcceptFocus
+                | Qt.WindowType.BypassWindowManagerHint
+            )
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        # On Windows: Apply native WS_EX_NOACTIVATE style so active window never loses focus
+        if sys.platform.startswith("win"):
+            try:
+                import ctypes
+                hwnd = int(self.winId())
+                GWL_EXSTYLE = -20
+                WS_EX_NOACTIVATE = 0x08000000
+                WS_EX_TOPMOST = 0x00000008
+                user32 = ctypes.windll.user32
+                cur_style = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
+                user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, cur_style | WS_EX_NOACTIVATE | WS_EX_TOPMOST)
+            except Exception:
+                pass
 
         # Drop shadow for depth
         shadow = QGraphicsDropShadowEffect(self)

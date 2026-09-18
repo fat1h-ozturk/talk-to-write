@@ -1,15 +1,16 @@
 # 🎙️ Talk-to-Write
 
-**Talk-to-Write**, Linux (özellikle KDE Wayland) kullanıcıları için geliştirilmiş, **Wispr Flow** ve **SuperWhisper** alternatifi, ultra hızlı ve akıllı bir sesli dikte masaüstü asistanıdır.
+**Talk-to-Write**, **Linux**, **Windows** ve **macOS** için geliştirilmiş, **Wispr Flow** ve **SuperWhisper** alternatifi, ultra hızlı ve akıllı bir sesli dikte masaüstü asistanıdır.
 
-Mikrofonunuzdan konuşmanızı dinler; konuşma dili dolgularını ("ııı", "şey", "yani", "falan") ve dilbilgisi hatalarını anında temizler. Aktif olan herhangi bir pencereye (kod editörü, tarayıcı, sohbet uygulamaları, terminal vb.) imleç odağını kaybetmeden doğrudan yazar.
+Mikrofonunuzdan konuşmanızı dinler; konuşma dili dolgularını ("ııı", "şey", "yani", "falan") ve dilbilgisi hatalarını anında temizler. Aktif olan herhangi bir pencereye (kod editörü, tarayıcı, Word, sohbet uygulamaları, terminal vb.) imleç odağını kaybetmeden doğrudan yazar.
 
 ---
 
 ## ✨ Temel Özellikler
 
+- **Çapraz Platform Desteği:** Linux (KDE Wayland/GNOME/Hyprland), Windows (10/11) ve macOS (Apple Silicon & Intel).
 - **Bas-Başlat / Bas-Bitir (Toggle Modu):** Tek bir kısayol tuşuyla (`Ctrl+Alt+Space`) kaydı başlatıp bitirin.
-- **Odak Kaybetmeyen Yüzen Kapsül (Layer Shell Overlay):** Ekranın üstünde beliren, ses dalgası animasyonlu modern arayüz. Wayland Layer Shell protokolü sayesinde **yazdığınız pencerenin imleç odağını asla bozmaz**.
+- **Odak Kaybetmeyen Yüzen Kapsül (Floating Pill):** Ekranın üstünde beliren, ses dalgası animasyonlu modern arayüz. Yazdığınız pencerenin **imleç odağını asla bozmaz**.
 - **Otomatik Ses Normalizasyonu (Volume Boost):** Kısık sesli veya laptop mikrofonlarını otomatik olarak analiz eder ve en ideal seviyeye yükselterek yapay zekaya iletir.
 - **Yapay Zeka Destekli Düzenleme:**
   - **Groq Cloud (Önerilen - Ultra Hızlı):** Whisper Large v3 Turbo (~200ms) + Llama/Qwen ile anında metin dökümü ve biçimlendirme.
@@ -26,144 +27,153 @@ Mikrofonunuzdan konuşmanızı dinler; konuşma dili dolgularını ("ııı", "�
 
 ---
 
-## 🛠️ Sistem Gereksinimleri ve Ön Koşullar
+## 🛠️ İşletim Sistemine Göre Kurulum
 
-Uygulamanın Wayland üzerinde klavye tuş simülasyonu yapabilmesi, küresel kısayolları dinleyebilmesi ve arayüzü odak kaybetmeden çizebilmesi için sisteminizde birkaç temel paket bulunmalıdır.
+<details open>
+<summary><b>🐧 Linux Kurulumu (KDE Wayland / GNOME / X11)</b></summary>
 
-### 1. Sistem Paketlerinin Kurulumu
+### 1. Sistem Paketlerini Yükleyin
+- **Fedora / RHEL:**
+  ```bash
+  sudo dnf install wl-clipboard ydotool gtk4-layer-shell python3-gobject pipewire-utils portaudio-devel alsa-lib
+  ```
+- **Ubuntu / Debian (22.04, 24.04+):**
+  ```bash
+  sudo apt update
+  sudo apt install wl-clipboard ydotool libgtk4-layer-shell0 gir1.2-gtk4layershell-1.0 python3-gi python3-gi-cairo portaudio19-dev python3-pip python3-venv libasound2-dev
+  ```
+- **Arch Linux / Manjaro:**
+  ```bash
+  sudo pacman -S wl-clipboard ydotool gtk4-layer-shell python-gobject portaudio alsa-lib
+  ```
 
-Kullandığınız dağıtıma uygun komutla gerekli kütüphaneleri yükleyin:
-
-#### **Fedora / RHEL:**
+### 2. İzinleri ve ydotool Servisini Ayarlayın
 ```bash
-sudo dnf install wl-clipboard ydotool gtk4-layer-shell python3-gobject pipewire-utils portaudio-devel alsa-lib
+sudo usermod -aG input $USER
+systemctl --user enable --now ydotool
 ```
+*(Grup değişikliğinin geçerli olması için oturumu kapatıp yeniden açın).*
 
-#### **Ubuntu / Debian (22.04, 24.04+):**
-```bash
-sudo apt update
-sudo apt install wl-clipboard ydotool libgtk4-layer-shell0 gir1.2-gtk4layershell-1.0 python3-gi python3-gi-cairo portaudio19-dev python3-pip python3-venv libasound2-dev
-```
-
-#### **Arch Linux / Manjaro:**
-```bash
-sudo pacman -S wl-clipboard ydotool gtk4-layer-shell python-gobject portaudio alsa-lib
-```
-
----
-
-### 2. Kritik İzinler ve `ydotool` Ayarı
-
-`ydotool` ve `evdev`, Wayland altında küresel kısayol dinlemek ve aktif pencereye `Ctrl+V` yapıştırma simülasyonu göndermek için giriş aygıtı erişimine ihtiyaç duyar.
-
-1. **Kullanıcınızı `input` grubuna ekleyin:**
-   ```bash
-   sudo usermod -aG input $USER
-   ```
-2. **`ydotool` arka plan servisini başlatın ve etkinleştirin:**
-   ```bash
-   systemctl --user enable --now ydotool
-   ```
-   *(Eğer dağıtımınızda user service tanımlı değilse, oturum açılışında arka planda `ydotoold &` çalıştırmanız yeterlidir).*
-
-> [!IMPORTANT]
-> Grup üyeliğinin (`input` grubu) sistemde aktif hale gelmesi için bu komutlardan sonra **oturumunuzu kapatıp yeniden açmanız (Log out / Log in)** veya bilgisayarınızı yeniden başlatmanız gerekir.
-
----
-
-## 📥 Proje Kurulumu
-
-### Adım 1: Depoyu Klonlayın
+### 3. Depoyu Klonlayın ve Python Ortamını Kurun
 ```bash
 git clone https://github.com/<kullanici-adiniz>/talk-to-write.git
 cd talk-to-write
-```
-
-### Adım 2: Python Sanal Ortamını Hazırlayın
-Sistemdeki GTK4 Layer Shell kütüphanesini görebilmesi için sanal ortamı `--system-site-packages` parametresiyle oluşturun:
-
-```bash
 python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .
+chmod +x bin/talk-to-write
 ```
 
-### Adım 3: Bağımlılıkları Yükleyin
+### 4. Başlatın
 ```bash
+./bin/talk-to-write
+```
+</details>
+
+<details>
+<summary><b>🪟 Windows Kurulumu (Windows 10 / 11)</b></summary>
+
+Windows üzerinde `ydotool` veya harici bir arka plan servisi kurmanıza gerek **yoktur**; yerel Win32 API (`keybd_event` ve `OpenClipboard`) doğrudan kullanılır.
+
+### 1. Python Kurulumu
+Bilgisayarınızda [Python 3.10 veya üzeri](https://www.python.org/downloads/) kurulu olmalıdır. Kurulum yaparken **"Add Python to PATH"** kutucuğunu işaretlemeyi unutmayın.
+
+### 2. Depoyu Klonlayın ve Bağımlılıkları Yükleyin
+Komut İstemi (cmd) veya PowerShell açın:
+
+```cmd
+git clone https://github.com/<kullanici-adiniz>/talk-to-write.git
+cd talk-to-write
+python -m venv .venv
+.venv\Scripts\activate
 pip install --upgrade pip
 pip install -r requirements.txt
 pip install -e .
 ```
 
-### Adım 4: Başlatıcı Betiğe Çalıştırma Yetkisi Verin
+### 3. Başlatın
+```cmd
+bin\talk-to-write.bat
+```
+*(Veya doğrudan `python -m talk_to_write`)*
+</details>
+
+<details>
+<summary><b>🍎 macOS Kurulumu (Apple Silicon M1/M2/M3/M4 & Intel)</b></summary>
+
+macOS üzerinde ses çalma (`afplay`), pano (`pbcopy`) ve metin yapıştırma (AppleScript `Cmd+V`) işletim sisteminin yerel araçlarıyla çalışır.
+
+### 1. Ön Koşul (PortAudio)
+Homebrew yüklü değilse [brew.sh](https://brew.sh) üzerinden yükleyin, ardından:
 ```bash
+brew install portaudio
+```
+
+### 2. Depoyu Klonlayın ve Bağımlılıkları Yükleyin
+```bash
+git clone https://github.com/<kullanici-adiniz>/talk-to-write.git
+cd talk-to-write
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .
 chmod +x bin/talk-to-write
 ```
 
----
-
-## 🚀 Başlatma ve Kullanım
-
-### 1. Uygulamayı Çalıştırma
+### 3. Başlatın ve İzinleri Verin
 ```bash
 ./bin/talk-to-write
 ```
-*(Arka planda sessizce çalıştırmak isterseniz: `./bin/talk-to-write &`)*
 
-### 2. API Anahtarınızı Tanımlama
-1. Ekranın sağ altındaki sistem çekmecesinde (System Tray) mor mikrofon ikonunu göreceksiniz.
-2. İkona **sağ tıklayın** ve **⚙️ Ayarlar...** seçeneğini açın.
-3. Tercihinize göre:
-   - **Groq Cloud (Önerilen):** [console.groq.com](https://console.groq.com) adresinden alacağınız ücretsiz API anahtarını yapıştırın.
-   - **Google Gemini:** Google AI Studio'dan aldığınız Gemini API anahtarını yapıştırın.
-4. **Kaydet** butonuna basın.
+> [!IMPORTANT]
+> macOS güvenlik kuralları gereği, uygulamanın mikrofonu dinleyebilmesi ve aktif pencereye `Cmd+V` gönderebilmesi için **Sistem Ayarları -> Gizlilik ve Güvenlik** altından:
+> 1. **Mikrofon (Microphone):** Terminal / Python için izin verin.
+> 2. **Erişilebilirlik (Accessibility):** Terminal / Python için izin verin.
 
-*(Alternatif olarak terminalinizde `export GROQ_API_KEY="gsk_..."` veya `export GEMINI_API_KEY="AIzaSy..."` tanımlayabilirsiniz).*
-
-### 3. Dikteyi Kullanma
-1. Herhangi bir metin kutusuna (örneğin Kate, VS Code, tarayıcı arama kutusu vb.) tıklayın.
-2. Klavyenizden **`Ctrl + Alt + Space`** tuşlarına basın.
-   - Ekranın üstünde şık bir kapsül belirecek ve siz konuştukça dinleyecektir (yazı imleciniz kaybolmaz).
-3. Cümlenizi söyleyin ve tekrar **`Ctrl + Alt + Space`** tuşuna basın.
-4. 1 saniye içinde filtrelenmiş, dilbilgisi düzeltilmiş metin doğrudan imlecin olduğu yere yapıştırılacaktır!
+</details>
 
 ---
 
-## ⌨️ Özel Kısayol Tuşu Atama (KDE Plasma & GNOME)
+## 🚀 Kullanım Adımları
 
-Uygulama varsayılan olarak `Ctrl+Alt+Space` tuşlarını dinler. Ancak dilediğiniz herhangi bir tuşu (örneğin `Meta+Space`, `CapsLock`, `F8`) tetikleyici yapmak için sistem kısayollarını kullanabilirsiniz:
+1. **API Anahtarını Girin:**
+   - Uygulama açıldığında sağ alt (veya macOS'ta üst menü çubuğundaki) sistem çekmecesi ikonuna **sağ tıklayın** ve **⚙️ Ayarlar...** seçeneğini açın.
+   - **Groq Cloud** (Önerilen, [console.groq.com](https://console.groq.com) üzerinden ücretsiz) veya **Google Gemini** API anahtarınızı girip **Kaydet**'e basın.
+   *(İsteğe bağlı olarak terminalinizde `export GROQ_API_KEY="gsk_..."` veya Windows'ta `set GROQ_API_KEY=...` tanımlayabilirsiniz).*
 
-### **KDE Plasma:**
-1. **Sistem Ayarları (System Settings)** -> **Kısayollar (Shortcuts)** bölümünü açın.
-2. Alttan **"Yeni Ekle" -> "Komut"** seçin.
-3. İsim: `Talk-to-Write Toggle`
-4. Komut:
-   ```bash
-   /projenin/bulundugu/tam/yol/talk-to-write/bin/talk-to-write --toggle
-   ```
-5. İstediğiniz tuşu atayın ve **Uygula**'ya basın.
+2. **Dikteyi Başlatın:**
+   - Herhangi bir uygulamadaki metin kutusuna (VS Code, Not Defteri, Word, tarayıcı, Slack vb.) tıklayın.
+   - Klavyenizden **`Ctrl + Alt + Space`** tuşlarına basın.
+   - Ekranın üstünde şık bir kapsül belirecek ve siz konuştukça dinleyecektir (yazı imleciniz kaybolmaz).
+3. **Dikteyi Bitirin:**
+   - Konuşmanız bittiğinde tekrar **`Ctrl + Alt + Space`** tuşlarına basın.
+   - 1 saniye içinde filtrelenmiş, dilbilgisi düzeltilmiş metin doğrudan imlecin olduğu yere yapıştırılacaktır!
 
-### **GNOME:**
-1. **Ayarlar** -> **Klavye** -> **Kısayolları Görüntüle ve Özelleştir** -> **Özel Kısayollar**.
-2. Yeni kısayol ekleyip komut olarak yukarıdaki `bin/talk-to-write --toggle` tam yolunu girin.
+---
+
+## ⌨️ Özel Kısayol Tuşu Entegrasyonu (`--toggle`)
+
+Her işletim sisteminde `talk-to-write --toggle` komutu çalışır durumda olan uygulamayı anında tetikler:
+
+- **Linux (KDE / GNOME):** Sistem Ayarları -> Kısayollar -> Yeni Komut: `talk-to-write --toggle`
+- **Windows:** AutoHotkey veya Windows Görev Çubuğu kısayolu ile `bin\talk-to-write.bat --toggle`
+- **macOS:** Kısayollar (Shortcuts) uygulaması veya Raycast / Alfred üzerinden `bin/talk-to-write --toggle`
 
 ---
 
 ## 🧪 Testleri Çalıştırma
 
-Kodların ve bağımlılıkların sisteminizde eksiksiz çalıştığını doğrulamak için birim testleri çalıştırabilirsiniz:
+Tüm platform adaptörlerini ve birim testleri doğrulamak için:
 
 ```bash
-.venv/bin/pytest -v
+pytest -v
 ```
 
 ---
 
-## ❓ Sorun Giderme (FAQ)
+## 📄 Lisans
 
-- **Soru: Tuşa bastığımda metin yapıştırılmıyor.**
-  - **Çözüm:** `ydotool` servisinin çalıştığından emin olun: `systemctl --user status ydotool`. Ayrıca kullanıcınızın `input` grubunda olduğunu `groups` komutuyla doğrulayın. Yeni eklendiyseniz oturumu kapatıp açmayı unutmayın.
-- **Soru: Kapsül ekranda görünmüyor veya odağı bozuyor.**
-  - **Çözüm:** `gtk4-layer-shell` paketinin sisteminizde kurulu olduğundan emin olun. Bu kütüphane Wayland üzerinde pencerenin klavye odağını çalmasını donanımsal olarak engeller.
-- **Soru: Sesim çok kısık algılanıyor.**
-  - **Çözüm:** Uygulama içerisinde otomatik kazanç artırımı (volume normalization) aktiftir, ancak KDE/GNOME Sistem Ses Ayarlarından mikrofon giriş seviyenizin en az %50 olduğundan emin olun.
-
+Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır. Katkıda bulunmaktan ve geliştirmekten çekinmeyin!

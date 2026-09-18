@@ -1,9 +1,25 @@
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-CONFIG_DIR = Path.home() / ".config" / "talk-to-write"
+def get_config_dir() -> Path:
+    """Returns standard config directory based on host OS."""
+    if sys.platform.startswith("win"):
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "talk-to-write"
+        return Path.home() / "AppData" / "Roaming" / "talk-to-write"
+    elif sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "talk-to-write"
+    else:
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        if xdg:
+            return Path(xdg) / "talk-to-write"
+        return Path.home() / ".config" / "talk-to-write"
+
+CONFIG_DIR = get_config_dir()
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 DEFAULT_CONFIG: Dict[str, Any] = {

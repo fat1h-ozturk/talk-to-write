@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "talk-to-write"
-version = "0.1.0"
-description = "High-performance, low-latency dictation and voice-to-text assistant for Linux"
+version = "0.2.0"
+description = "High-performance, low-latency cross-platform dictation assistant for Linux, Windows, and macOS"
 authors = [{ name = "Fatih" }]
 license = { text = "MIT" }
 readme = "README.md"
@@ -13,7 +13,9 @@ requires-python = ">=3.10"
 dependencies = [
     "PySide6>=6.5.0",
     "requests>=2.28.0",
-    "evdev>=1.6.0",
+    "pyaudio>=0.2.14",
+    "evdev>=1.6.0; platform_system=='Linux'",
+    "pynput>=1.7.6; platform_system!='Linux'",
 ]
 
 [project.scripts]

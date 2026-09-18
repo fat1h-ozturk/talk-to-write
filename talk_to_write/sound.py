@@ -5,9 +5,11 @@ Generates pleasant acoustic chimes for start, stop, success, and error states.
 
 import io
 import math
+import os
 import shutil
 import struct
 import subprocess
+import sys
 import threading
 import wave
 from typing import Dict
@@ -18,8 +20,9 @@ class SoundPlayer:
     def __init__(self, enabled: bool = True):
         self.enabled = enabled
         self._cache: Dict[str, bytes] = {}
-        self._has_pw_play = shutil.which("pw-play") is not None
-        self._has_aplay = shutil.which("aplay") is not None
+        self._has_pw_play = sys.platform.startswith("linux") and (shutil.which("pw-play") is not None)
+        self._has_aplay = sys.platform.startswith("linux") and (shutil.which("aplay") is not None)
+        self._has_afplay = sys.platform == "darwin" and (shutil.which("afplay") is not None)
         self._init_sounds()
 
     def _init_sounds(self) -> None:
@@ -79,6 +82,32 @@ class SoundPlayer:
         threading.Thread(target=self._play_bytes, args=(wav_data,), daemon=True).start()
 
     def _play_bytes(self, wav_data: bytes) -> None:
+        # 1. Windows: Native winsound API
+        if sys.platform.startswith("win"):
+            try:
+                import winsound
+                winsound.PlaySound(wav_data, winsound.SND_MEMORY)
+                return
+            except Exception as e:
+                pass
+
+        # 2. macOS: Built-in afplay
+        if sys.platform == "darwin":
+            try:
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                    f.write(wav_data)
+                    tmp_path = f.name
+                subprocess.run(["afplay", tmp_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+                return
+            except Exception:
+                pass
+
+        # 3. Linux: pw-play or aplay
         try:
             if self._has_pw_play:
                 subprocess.run(["pw-play", "-"], input=wav_data, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
