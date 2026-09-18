@@ -72,30 +72,52 @@ pip install -e .
 python -m talk_to_write --install
 ```
 
-### 4. Başlatın
+### 4. Güncelleme Nasıl Yapılır?
+Yeni bir sürüm yayınlandığında tek komutla güncellemek için:
+```bash
+./update.sh
+```
+veya manuel:
+```bash
+git pull
+.venv/bin/pip install -r requirements.txt
+```
+
+### 5. Başlatın
 - **Başlat Menüsü / KRunner:** Süper (Windows) tuşuna basıp `Talk-to-Write` veya `Dikte` yazarak açabilirsiniz.
 - **Terminalden:** `./bin/talk-to-write`
 </details>
 
 <details>
-<summary><b>🪟 Windows Kurulumu (Windows 10 / 11)</b></summary>
+<summary><b>🪟 Windows Kurulumu & Güncelleme (Windows 10 / 11)</b></summary>
 
 Windows üzerinde `ydotool` veya harici bir arka plan servisi kurmanıza gerek **yoktur**; yerel Win32 API (`keybd_event` ve `OpenClipboard`) doğrudan kullanılır.
 
-### 1. Python Kurulumu
-Bilgisayarınızda [Python 3.10 veya üzeri](https://www.python.org/downloads/) kurulu olmalıdır. Kurulum yaparken **"Add Python to PATH"** kutucuğunu işaretlemeyi unutmayın.
+### 1. Ön Koşullar
+1. **Git for Windows**: Güncellemeleri kolayca alabilmek için [Git for Windows](https://git-scm.com/download/win) kurulu olmalıdır.
+2. **Python 3.10 veya üzeri**: [python.org](https://www.python.org/downloads/) üzerinden indirip kurun. Kurulum sihirbazının ilk ekranında en alttaki **"Add python.exe to PATH"** seçeneğini mutlaka işaretleyin!
 
-### 2. Tek Tıkla Kurulum (Önerilen)
-Komut İstemi (cmd) veya PowerShell açın:
+### 2. Klonlama ve Kurulum (Önerilen)
+Komut İstemi (CMD) veya PowerShell açın:
 ```cmd
-git clone https://github.com/<kullanici-adiniz>/talk-to-write.git
+git clone https://github.com/fat1h-ozturk/talk-to-write.git
 cd talk-to-write
 install.bat
 ```
-> `install.bat` tüm ortamı kurar ve Windows Başlat Menüsü'ne "Talk-to-Write" kısayolunu otomatik ekler.
+> `install.bat`, sanal ortamı (`.venv`) kurar, bağımlılıkları yükler, projeyi **geliştirici/düzenlenebilir (editable -e)** modda kaydeder ve Windows Başlat Menüsü'ne "Talk-to-Write" kısayolunu ekler.
 
-### 3. Başlatın
-- **Windows Başlat Menüsü:** Klavyeden Windows tuşuna basıp `Talk-to-Write` yazın.
+### 3. Nasıl Güncellenir?
+Projeye yeni bir özellik veya hata düzeltmesi geldiğinde:
+- **Yöntem 1 (Tek Tık):** Klasördeki **`update.bat`** dosyasına çift tıklayın.
+- **Yöntem 2 (Komut İstemi):**
+  ```cmd
+  cd talk-to-write
+  update.bat
+  ```
+> `update.bat` otomatik olarak en son kodları GitHub'dan çeker (`git pull`), gerekiyorsa yeni kütüphaneleri yükler ve kısayolları günceller.
+
+### 4. Başlatın
+- **Windows Başlat Menüsü:** Klavyeden Windows tuşuna basıp `Talk-to-Write` yazarak açın.
 - **Veya Komut Satırından:** `bin\talk-to-write.bat`
 </details>
 
