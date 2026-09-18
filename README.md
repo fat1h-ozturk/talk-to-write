@@ -57,7 +57,7 @@ systemctl --user enable --now ydotool
 ### 3. Tek Tıkla Kurulum ve Başlat Menüsüne Ekleme (Önerilen)
 Depoyu klonlayıp tek komutla kurabilirsiniz:
 ```bash
-git clone https://github.com/<kullanici-adiniz>/talk-to-write.git
+git clone https://github.com/fat1h-ozturk/talk-to-write.git
 cd talk-to-write
 ./install.sh
 ```
@@ -89,36 +89,48 @@ git pull
 </details>
 
 <details>
-<summary><b>🪟 Windows Kurulumu & Güncelleme (Windows 10 / 11)</b></summary>
+<summary><b>🪟 Windows Kurulumu & Güncellenebilir Yapılandırma (Windows 10 / 11)</b></summary>
 
-Windows üzerinde `ydotool` veya harici bir arka plan servisi kurmanıza gerek **yoktur**; yerel Win32 API (`keybd_event` ve `OpenClipboard`) doğrudan kullanılır.
+Windows üzerinde harici bir servis kurmanıza gerek **yoktur**; yerel Win32 API (`keybd_event` ve `OpenClipboard`) doğrudan kullanılır.
 
-### 1. Ön Koşullar
-1. **Git for Windows**: Güncellemeleri kolayca alabilmek için [Git for Windows](https://git-scm.com/download/win) kurulu olmalıdır.
-2. **Python 3.10 veya üzeri**: [python.org](https://www.python.org/downloads/) üzerinden indirip kurun. Kurulum sihirbazının ilk ekranında en alttaki **"Add python.exe to PATH"** seçeneğini mutlaka işaretleyin!
+### 1. Ön Koşullar (Yalnızca İlk Kurulumda)
+1. **Git for Windows**: Güncellemeleri alabilmek için [Git for Windows](https://git-scm.com/download/win) kurulu olmalıdır.
+2. **Python 3.10 veya üzeri**: [python.org](https://www.python.org/downloads/) üzerinden indirip kurun.
+   > [!IMPORTANT]
+   > Python kurulum sihirbazının ilk ekranında yer alan **"Add python.exe to PATH"** kutucuğunu **kesinlikle işaretleyin**.
 
-### 2. Klonlama ve Kurulum (Önerilen)
-Komut İstemi (CMD) veya PowerShell açın:
+### 2. Klonlama ve Tek Tıkla Kurulum
+Komut İstemi'ni (**CMD**) veya **PowerShell**'i açın:
 ```cmd
 git clone https://github.com/fat1h-ozturk/talk-to-write.git
 cd talk-to-write
 install.bat
 ```
-> `install.bat`, sanal ortamı (`.venv`) kurar, bağımlılıkları yükler, projeyi **geliştirici/düzenlenebilir (editable -e)** modda kaydeder ve Windows Başlat Menüsü'ne "Talk-to-Write" kısayolunu ekler.
 
-### 3. Nasıl Güncellenir?
-Projeye yeni bir özellik veya hata düzeltmesi geldiğinde:
-- **Yöntem 1 (Tek Tık):** Klasördeki **`update.bat`** dosyasına çift tıklayın.
-- **Yöntem 2 (Komut İstemi):**
+> [!NOTE]
+> **Neden Doğrudan Güncellenebilir?**  
+> `install.bat` sihirbazı, uygulamayı sanal ortama **`-e` (editable / düzenlenebilir)** modunda bağlar. Kod dosyaları kopyalanmaz, klonlanan bu klasöre canlı referans verilir. Başlat Menüsü'ne eklenen kısayol da doğrudan bu ortama bağlanır. Bu sayede klasördeki kod güncellendiğinde tüm Windows sisteminde anında güncellenmiş olur!
+
+### 3. İleride Nasıl Güncellenir?
+Projeye yeni bir özellik veya doğruluk iyileştirmesi geldiğinde iki yöntemle güncelleyebilirsiniz:
+
+- **Yöntem 1 (Tek Tıkla - En Pratik):**  
+  `talk-to-write` klasöründeki **`update.bat`** dosyasına çift tıklayın.
+- **Yöntem 2 (Komut İstemi / Terminal):**
   ```cmd
   cd talk-to-write
   update.bat
   ```
-> `update.bat` otomatik olarak en son kodları GitHub'dan çeker (`git pull`), gerekiyorsa yeni kütüphaneleri yükler ve kısayolları günceller.
+
+**`update.bat` arka planda ne yapar?**
+1. GitHub deposundan en güncel değişiklikleri çeker (`git pull`).
+2. `.venv` ortamına yeni bir paket gereksinimi eklendiyse otomatik yükler (`pip install -r requirements.txt`).
+3. Windows Başlat Menüsü ve masaüstü bağlantılarını yeniler.
+4. Başarı bildirimini ekranda gösterir.
 
 ### 4. Başlatın
-- **Windows Başlat Menüsü:** Klavyeden Windows tuşuna basıp `Talk-to-Write` yazarak açın.
-- **Veya Komut Satırından:** `bin\talk-to-write.bat`
+- **Windows Başlat Menüsü:** Klavyenizdeki Windows tuşuna basıp `Talk-to-Write` yazarak uygulamayı açabilirsiniz.
+- **Komut Satırından:** `bin\talk-to-write.bat`
 </details>
 
 <details>
@@ -134,7 +146,7 @@ brew install portaudio
 
 ### 2. Depoyu Klonlayın ve Bağımlılıkları Yükleyin
 ```bash
-git clone https://github.com/<kullanici-adiniz>/talk-to-write.git
+git clone https://github.com/fat1h-ozturk/talk-to-write.git
 cd talk-to-write
 python3 -m venv .venv
 source .venv/bin/activate
