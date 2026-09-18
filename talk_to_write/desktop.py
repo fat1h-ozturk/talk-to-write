@@ -158,8 +158,60 @@ def _create_windows_shortcut(target: Path, shortcut_path: Path, description: str
 
 # --- MACOS INTEGRATION ---
 
+def _get_mac_app_path() -> Path:
+    return Path.home() / "Applications" / "Talk-to-Write.app"
+
 def _get_mac_launch_agent_path() -> Path:
     return Path.home() / "Library" / "LaunchAgents" / "com.talktowrite.app.plist"
+
+def _install_mac_app() -> bool:
+    """Creates a minimal macOS .app bundle in ~/Applications pointing to bin/talk-to-write."""
+    try:
+        app_dir = _get_mac_app_path()
+        macos_dir = app_dir / "Contents" / "MacOS"
+        macos_dir.mkdir(parents=True, exist_ok=True)
+
+        launcher = get_launcher_path()
+        exec_script = macos_dir / "Talk-to-Write"
+        exec_script.write_text(f"""#!/bin/bash
+exec "{launcher}" "$@"
+""", encoding="utf-8")
+        exec_script.chmod(0o755)
+
+        info_plist = app_dir / "Contents" / "Info.plist"
+        info_plist.write_text("""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Talk-to-Write</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.talktowrite.app</string>
+    <key>CFBundleName</key>
+    <string>Talk-to-Write</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.2.0</string>
+    <key>LSUIElement</key>
+    <string>1</string>
+</dict>
+</plist>
+""", encoding="utf-8")
+        return True
+    except Exception as e:
+        print(f"[Desktop] Error installing macOS app: {e}")
+        return False
+
+def _uninstall_mac_app() -> bool:
+    try:
+        app_dir = _get_mac_app_path()
+        if app_dir.exists():
+            shutil.rmtree(app_dir, ignore_errors=True)
+        return True
+    except Exception as e:
+        print(f"[Desktop] Error removing macOS app: {e}")
+        return False
 
 
 # --- PUBLIC API ---
@@ -172,7 +224,7 @@ def is_desktop_installed() -> bool:
             return False
         return (programs / "Talk-to-Write.lnk").exists()
     elif sys.platform.startswith("darwin"):
-        return (Path.home() / "Applications" / "Talk-to-Write.app").exists()
+        return _get_mac_app_path().exists()
     else:
         return _get_linux_desktop_path().exists()
 
@@ -193,7 +245,7 @@ def install_desktop_entry() -> bool:
     Registers Talk-to-Write with the OS Application Menu / Search.
     Linux: ~/.local/share/applications/talk-to-write.desktop & icon themes.
     Windows: Start Menu Programs shortcut.
-    macOS: ~/Applications shortcut.
+    macOS: ~/Applications/Talk-to-Write.app bundle.
     """
     try:
         if sys.platform.startswith("win"):
@@ -203,8 +255,7 @@ def install_desktop_entry() -> bool:
             launcher = get_launcher_path()
             return _create_windows_shortcut(launcher, programs / "Talk-to-Write.lnk")
         elif sys.platform.startswith("darwin"):
-            # macOS desktop alias / app registration
-            return True
+            return _install_mac_app()
         else:
             # 1. Install icons
             _install_linux_icons()
@@ -231,7 +282,7 @@ def uninstall_desktop_entry() -> bool:
                 (programs / "Talk-to-Write.lnk").unlink()
             return True
         elif sys.platform.startswith("darwin"):
-            return True
+            return _uninstall_mac_app()
         else:
             dest_file = _get_linux_desktop_path()
             if dest_file.exists():

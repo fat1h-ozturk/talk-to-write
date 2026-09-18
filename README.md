@@ -61,7 +61,8 @@ git clone https://github.com/fat1h-ozturk/talk-to-write.git
 cd talk-to-write
 ./install.sh
 ```
-> Kurulum betiği sanal ortamı hazırlar, bağımlılıkları yükler ve Talk-to-Write'ı doğrudan **Başlat Menünüze (KDE Kickoff, GNOME Arama)** simgesiyle birlikte kaydeder.
+> [!NOTE]
+> `install.sh` betiği sanal ortamı hazırlar, bağımlılıkları yükler, projeyi **`-e` (editable / düzenlenebilir)** modda kurar ve Talk-to-Write'ı doğrudan **Başlat Menünüze (KDE Kickoff, GNOME Arama)** simgesiyle kaydeder.
 
 *(Alternatif Manuel Kurulum)*:
 ```bash
@@ -72,16 +73,12 @@ pip install -e .
 python -m talk_to_write --install
 ```
 
-### 4. Güncelleme Nasıl Yapılır?
-Yeni bir sürüm yayınlandığında tek komutla güncellemek için:
+### 4. İleride Nasıl Güncellenir?
+Projeye yeni bir özellik veya hata düzeltmesi geldiğinde tek komutla güncelleyin:
 ```bash
 ./update.sh
 ```
-veya manuel:
-```bash
-git pull
-.venv/bin/pip install -r requirements.txt
-```
+> `update.sh` betiği `git pull` ile en son kodları çeker, gerekiyorsa yeni paketleri yükler ve başlat menüsü entegrasyonunu yeniler.
 
 ### 5. Başlatın
 - **Başlat Menüsü / KRunner:** Süper (Windows) tuşuna basıp `Talk-to-Write` veya `Dikte` yazarak açabilirsiniz.
@@ -89,7 +86,7 @@ git pull
 </details>
 
 <details>
-<summary><b>🪟 Windows Kurulumu & Güncellenebilir Yapılandırma (Windows 10 / 11)</b></summary>
+<summary><b>🪟 Windows Kurulumu & Güncelleme (Windows 10 / 11)</b></summary>
 
 Windows üzerinde harici bir servis kurmanıza gerek **yoktur**; yerel Win32 API (`keybd_event` ve `OpenClipboard`) doğrudan kullanılır.
 
@@ -112,8 +109,7 @@ install.bat
 > `install.bat` sihirbazı, uygulamayı sanal ortama **`-e` (editable / düzenlenebilir)** modunda bağlar. Kod dosyaları kopyalanmaz, klonlanan bu klasöre canlı referans verilir. Başlat Menüsü'ne eklenen kısayol da doğrudan bu ortama bağlanır. Bu sayede klasördeki kod güncellendiğinde tüm Windows sisteminde anında güncellenmiş olur!
 
 ### 3. İleride Nasıl Güncellenir?
-Projeye yeni bir özellik veya doğruluk iyileştirmesi geldiğinde iki yöntemle güncelleyebilirsiniz:
-
+Projeye yeni bir özellik veya doğruluk iyileştirmesi geldiğinde:
 - **Yöntem 1 (Tek Tıkla - En Pratik):**  
   `talk-to-write` klasöründeki **`update.bat`** dosyasına çift tıklayın.
 - **Yöntem 2 (Komut İstemi / Terminal):**
@@ -134,37 +130,46 @@ Projeye yeni bir özellik veya doğruluk iyileştirmesi geldiğinde iki yönteml
 </details>
 
 <details>
-<summary><b>🍎 macOS Kurulumu (Apple Silicon M1/M2/M3/M4 & Intel)</b></summary>
+<summary><b>🍎 macOS Kurulumu & Güncelleme (Apple Silicon M1/M2/M3/M4 & Intel)</b></summary>
 
 macOS üzerinde ses çalma (`afplay`), pano (`pbcopy`) ve metin yapıştırma (AppleScript `Cmd+V`) işletim sisteminin yerel araçlarıyla çalışır.
 
-### 1. Ön Koşul (PortAudio)
-Homebrew yüklü değilse [brew.sh](https://brew.sh) üzerinden yükleyin, ardından:
-```bash
-brew install portaudio
-```
+### 1. Ön Koşullar
+1. **Homebrew & PortAudio**: Terminal açıp PortAudio'yu kurun:
+   ```bash
+   brew install portaudio
+   ```
+2. **Git & Python 3.10+**: macOS ile gelen veya Homebrew (`brew install python git`) sürümlerini kullanabilirsiniz.
 
-### 2. Depoyu Klonlayın ve Bağımlılıkları Yükleyin
+### 2. Klonlama ve Tek Tıkla Kurulum
+Terminali açıp depoyu klonlayın:
 ```bash
 git clone https://github.com/fat1h-ozturk/talk-to-write.git
 cd talk-to-write
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install -e .
-chmod +x bin/talk-to-write
+./install.sh
 ```
+*(veya Finder üzerinden klasördeki **`install.command`** dosyasına çift tıklayabilirsiniz).*
 
-### 3. Başlatın ve İzinleri Verin
-```bash
-./bin/talk-to-write
-```
+> [!NOTE]
+> `install.sh`, sanal ortamı kurar, bağımlılıkları yükler, projeyi **`-e` (editable / düzenlenebilir)** modda bağlar ve macOS **Spotlight / Launchpad** araması için `~/Applications/Talk-to-Write.app` paketini otomatik oluşturur.
+
+### 3. İleride Nasıl Güncellenir?
+Yeni güncellemeleri almak için:
+- **Yöntem 1 (Finder'dan Çift Tık):** Klasördeki **`update.command`** dosyasına çift tıklayın.
+- **Yöntem 2 (Terminalden):**
+  ```bash
+  cd talk-to-write
+  ./update.sh
+  ```
+
+### 4. Başlatın ve İzinleri Verin
+- **Spotlight:** `Cmd+Space` tuşlarına basıp `Talk-to-Write` yazarak açın.
+- **Terminalden:** `./bin/talk-to-write`
 
 > [!IMPORTANT]
-> macOS güvenlik kuralları gereği, uygulamanın mikrofonu dinleyebilmesi ve aktif pencereye `Cmd+V` gönderebilmesi için **Sistem Ayarları -> Gizlilik ve Güvenlik** altından:
-> 1. **Mikrofon (Microphone):** Terminal / Python için izin verin.
-> 2. **Erişilebilirlik (Accessibility):** Terminal / Python için izin verin.
+> macOS güvenlik kuralları gereği, uygulamanın mikrofonu dinleyebilmesi ve aktif pencereye `Cmd+V` yapıştırma simülasyonu gönderebilmesi için **Sistem Ayarları -> Gizlilik ve Güvenlik** altından:
+> 1. **Mikrofon (Microphone):** Terminal / Talk-to-Write için izin verin.
+> 2. **Erişilebilirlik (Accessibility):** Terminal / Talk-to-Write için izin verin.
 
 </details>
 

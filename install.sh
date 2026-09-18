@@ -35,11 +35,11 @@ echo "📦 Bağımlılıklar yükleniyor/güncelleniyor..."
 .venv/bin/pip install -r requirements.txt -q
 .venv/bin/pip install -e . --no-deps -q
 
-# 4. Make launcher script executable
-chmod +x bin/talk-to-write
+# 4. Make launcher scripts executable
+chmod +x bin/talk-to-write update.sh install.sh install.command update.command 2>/dev/null || true
 
-# 5. Register with Desktop Environment & Application Menu
-echo "🚀 Başlat Menüsü ve Uygulama Arama entegrasyonu yapılıyor..."
+# 5. Register with Desktop Environment & Application Menu / Spotlight
+echo "🚀 Başlat Menüsü / Uygulama Arama entegrasyonu yapılıyor..."
 .venv/bin/python -m talk_to_write --install
 
 echo "======================================================"
