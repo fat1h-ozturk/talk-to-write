@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Talk-to-Write: One-Click Linux Setup & Application Menu Registration Script
+# ==============================================================================
+
+set -e
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$DIR"
+
+echo "======================================================"
+echo "🎙️  Talk-to-Write Kurulum Sihirbazı"
+echo "======================================================"
+
+# 1. Check Python 3
+if ! command -v python3 &> /dev/null; then
+    echo "❌ Hata: python3 bulunamadı. Lütfen Python 3.9 veya üstünü yükleyin."
+    exit 1
+fi
+
+PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+echo "✓ Python $PYTHON_VERSION algılandı."
+
+# 2. Setup Virtual Environment
+if [ ! -d ".venv" ]; then
+    echo "📦 Sanal ortam (.venv) oluşturuluyor (--system-site-packages)..."
+    python3 -m venv --system-site-packages .venv
+else
+    echo "✓ Sanal ortam (.venv) mevcut."
+fi
+
+# 3. Install Python Dependencies
+echo "📦 Bağımlılıklar yükleniyor/güncelleniyor..."
+.venv/bin/pip install --upgrade pip -q
+.venv/bin/pip install -r requirements.txt -q
+.venv/bin/pip install -e . --no-deps -q
+
+# 4. Make launcher script executable
+chmod +x bin/talk-to-write
+
+# 5. Register with Desktop Environment & Application Menu
+echo "🚀 Başlat Menüsü ve Uygulama Arama entegrasyonu yapılıyor..."
+.venv/bin/python -m talk_to_write --install
+
+echo "======================================================"
+echo "🎉 Kurulum Başarıyla Tamamlandı!"
+echo ""
+echo "📌 Kullanım Seçenekleri:"
+echo "  1. Başlat Menüsü / KRunner: 'Talk-to-Write' veya 'Dikte' yazarak açabilirsiniz."
+echo "  2. Terminalden çalıştırmak için: ./bin/talk-to-write"
+echo "  3. Kaydı başlatmak / durdurmak için kısayol: Ctrl+Alt+Space"
+echo "======================================================"

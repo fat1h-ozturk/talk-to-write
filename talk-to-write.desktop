@@ -1,9 +1,14 @@
 [Desktop Entry]
 Name=Talk-to-Write
-Comment=Wispr Flow & SuperWhisper alternative dictation assistant
-Exec=/home/fatih/projects/talk-to-write/bin/talk-to-write
-Icon=audio-input-microphone
+GenericName=Sesli Dikte Asistanı
+GenericName[en]=Voice Dictation Assistant
+Comment=Wispr Flow & SuperWhisper alternatifi ultra hızlı sesli dikte
+Comment[en]=Ultra-fast AI voice dictation desktop assistant
+Exec=talk-to-write %U
+Icon=talk-to-write
 Terminal=false
 Type=Application
 Categories=Utility;AudioVideo;
-Keywords=dictation;speech;whisper;gemini;stt;voice;
+Keywords=dictation;dikte;speech;whisper;gemini;stt;voice;ses;yazma;ai;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true

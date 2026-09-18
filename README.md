@@ -54,22 +54,27 @@ systemctl --user enable --now ydotool
 ```
 *(Grup değişikliğinin geçerli olması için oturumu kapatıp yeniden açın).*
 
-### 3. Depoyu Klonlayın ve Python Ortamını Kurun
+### 3. Tek Tıkla Kurulum ve Başlat Menüsüne Ekleme (Önerilen)
+Depoyu klonlayıp tek komutla kurabilirsiniz:
 ```bash
 git clone https://github.com/<kullanici-adiniz>/talk-to-write.git
 cd talk-to-write
+./install.sh
+```
+> Kurulum betiği sanal ortamı hazırlar, bağımlılıkları yükler ve Talk-to-Write'ı doğrudan **Başlat Menünüze (KDE Kickoff, GNOME Arama)** simgesiyle birlikte kaydeder.
+
+*(Alternatif Manuel Kurulum)*:
+```bash
 python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
-pip install --upgrade pip
 pip install -r requirements.txt
 pip install -e .
-chmod +x bin/talk-to-write
+python -m talk_to_write --install
 ```
 
 ### 4. Başlatın
-```bash
-./bin/talk-to-write
-```
+- **Başlat Menüsü / KRunner:** Süper (Windows) tuşuna basıp `Talk-to-Write` veya `Dikte` yazarak açabilirsiniz.
+- **Terminalden:** `./bin/talk-to-write`
 </details>
 
 <details>
@@ -80,24 +85,18 @@ Windows üzerinde `ydotool` veya harici bir arka plan servisi kurmanıza gerek *
 ### 1. Python Kurulumu
 Bilgisayarınızda [Python 3.10 veya üzeri](https://www.python.org/downloads/) kurulu olmalıdır. Kurulum yaparken **"Add Python to PATH"** kutucuğunu işaretlemeyi unutmayın.
 
-### 2. Depoyu Klonlayın ve Bağımlılıkları Yükleyin
+### 2. Tek Tıkla Kurulum (Önerilen)
 Komut İstemi (cmd) veya PowerShell açın:
-
 ```cmd
 git clone https://github.com/<kullanici-adiniz>/talk-to-write.git
 cd talk-to-write
-python -m venv .venv
-.venv\Scripts\activate
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install -e .
+install.bat
 ```
+> `install.bat` tüm ortamı kurar ve Windows Başlat Menüsü'ne "Talk-to-Write" kısayolunu otomatik ekler.
 
 ### 3. Başlatın
-```cmd
-bin\talk-to-write.bat
-```
-*(Veya doğrudan `python -m talk_to_write`)*
+- **Windows Başlat Menüsü:** Klavyeden Windows tuşuna basıp `Talk-to-Write` yazın.
+- **Veya Komut Satırından:** `bin\talk-to-write.bat`
 </details>
 
 <details>

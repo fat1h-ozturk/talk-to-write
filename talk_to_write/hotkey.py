@@ -35,9 +35,17 @@ except ImportError:
 class HotkeyManager:
     """Manages system-wide hotkeys and IPC socket trigger across OS platforms."""
 
-    def __init__(self, hotkey_str: str = "Ctrl+Alt+Space", on_toggle: Optional[Callable[[], None]] = None):
+    def __init__(
+        self,
+        hotkey_str: str = "Ctrl+Alt+Space",
+        on_toggle: Optional[Callable[[], None]] = None,
+        on_notify_running: Optional[Callable[[], None]] = None,
+        on_open_settings: Optional[Callable[[], None]] = None,
+    ):
         self.hotkey_str = hotkey_str
         self.on_toggle = on_toggle
+        self.on_notify_running = on_notify_running
+        self.on_open_settings = on_open_settings
         self.is_running = False
         self._threads: List[threading.Thread] = []
         self._active_keys: Set[int] = set()
@@ -107,10 +115,20 @@ class HotkeyManager:
                 conn, _ = server.accept()
                 with conn:
                     data = conn.recv(128).decode("utf-8").strip()
-                    if data == "toggle" and self.on_toggle:
-                        self.on_toggle()
+                    if data == "toggle":
+                        if self.on_toggle:
+                            self.on_toggle()
+                        conn.sendall(b"ok")
                     elif data == "ping":
                         conn.sendall(b"pong")
+                    elif data == "notify_running":
+                        if self.on_notify_running:
+                            self.on_notify_running()
+                        conn.sendall(b"ok")
+                    elif data == "open_settings":
+                        if self.on_open_settings:
+                            self.on_open_settings()
+                        conn.sendall(b"ok")
             except socket.timeout:
                 continue
             except Exception as e:
@@ -246,27 +264,46 @@ class HotkeyManager:
                     self.on_toggle()
 
 
-def send_ipc_toggle() -> bool:
-    """Sends a toggle trigger to a running Talk-to-Write instance across OS platforms."""
+def send_ipc_message(message: str, timeout: float = 1.0) -> Optional[str]:
+    """Sends an arbitrary message to a running Talk-to-Write instance and returns the reply."""
     if sys.platform.startswith("win"):
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.settimeout(1.0)
+            client.settimeout(timeout)
             client.connect(("127.0.0.1", TCP_PORT))
-            client.sendall(b"toggle")
+            client.sendall(message.encode("utf-8"))
+            reply = client.recv(128).decode("utf-8").strip()
             client.close()
-            return True
+            return reply
         except Exception:
-            return False
+            return None
     else:
         if not os.path.exists(SOCKET_PATH):
-            return False
+            return None
         try:
             client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            client.settimeout(1.0)
+            client.settimeout(timeout)
             client.connect(SOCKET_PATH)
-            client.sendall(b"toggle")
+            client.sendall(message.encode("utf-8"))
+            reply = client.recv(128).decode("utf-8").strip()
             client.close()
-            return True
+            return reply
         except Exception:
-            return False
+            return None
+
+def is_instance_running() -> bool:
+    """Checks if another instance of Talk-to-Write is actively running and responding."""
+    return send_ipc_message("ping") == "pong"
+
+def notify_running_instance() -> bool:
+    """Notifies the running instance that the user attempted to launch it again."""
+    return send_ipc_message("notify_running") == "ok"
+
+def open_running_settings() -> bool:
+    """Requests the running instance to open its Settings window."""
+    return send_ipc_message("open_settings") == "ok"
+
+def send_ipc_toggle() -> bool:
+    """Sends a toggle trigger to a running Talk-to-Write instance across OS platforms."""
+    res = send_ipc_message("toggle")
+    return res in ("ok", "pong", "") or res is not None

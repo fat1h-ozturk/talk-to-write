@@ -23,6 +23,13 @@ from PySide6.QtWidgets import (
 )
 
 from ..config import ConfigManager
+from ..desktop import (
+    install_desktop_entry,
+    is_autostart_enabled,
+    is_desktop_installed,
+    set_autostart,
+    uninstall_desktop_entry,
+)
 
 DARK_STYLE = """
 QDialog {
@@ -91,7 +98,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.config = config
         self.setWindowTitle("Talk-to-Write Ayarları")
-        self.resize(520, 560)
+        self.resize(540, 650)
         self.setStyleSheet(DARK_STYLE)
 
         self._build_ui()
@@ -185,6 +192,29 @@ class SettingsDialog(QDialog):
         pref_layout.addWidget(self.restore_clip_check)
         main_layout.addLayout(pref_layout)
 
+        # 5. Desktop & Startup Integration Group
+        desktop_group = QGroupBox("Sistem & Başlat Menüsü Entegrasyonu")
+        desktop_layout = QVBoxLayout(desktop_group)
+        desktop_layout.setSpacing(8)
+
+        menu_row = QHBoxLayout()
+        self.desktop_status_lbl = QLabel("Uygulama Menüsü: Kontrol ediliyor...")
+        self.desktop_status_lbl.setStyleSheet("color: #e4e4e7; font-size: 12px;")
+
+        self.desktop_action_btn = QPushButton("Menüye Ekle")
+        self.desktop_action_btn.clicked.connect(self._toggle_desktop_entry)
+
+        menu_row.addWidget(self.desktop_status_lbl)
+        menu_row.addStretch()
+        menu_row.addWidget(self.desktop_action_btn)
+        desktop_layout.addLayout(menu_row)
+
+        self.autostart_check = QCheckBox("Bilgisayar açıldığında arka planda otomatik başlat (Autostart)")
+        self.autostart_check.toggled.connect(self._on_autostart_toggled)
+        desktop_layout.addWidget(self.autostart_check)
+
+        main_layout.addWidget(desktop_group)
+
         main_layout.addStretch()
 
         # Bottom Buttons
@@ -222,6 +252,29 @@ class SettingsDialog(QDialog):
         else:
             self.gemini_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
 
+    def _update_desktop_status(self) -> None:
+        installed = is_desktop_installed()
+        if installed:
+            self.desktop_status_lbl.setText("✓ Başlat / Uygulama menüsüne kayıtlı")
+            self.desktop_status_lbl.setStyleSheet("color: #4ade80; font-size: 12px; font-weight: 500;")
+            self.desktop_action_btn.setText("Menüden Kaldır")
+        else:
+            self.desktop_status_lbl.setText("✗ Uygulama menüsüne kayıtlı değil")
+            self.desktop_status_lbl.setStyleSheet("color: #f87171; font-size: 12px; font-weight: 500;")
+            self.desktop_action_btn.setText("Menüye Ekle")
+
+    def _toggle_desktop_entry(self) -> None:
+        if is_desktop_installed():
+            uninstall_desktop_entry()
+            QMessageBox.information(self, "Bilgi", "Talk-to-Write uygulama menüsünden kaldırıldı.")
+        else:
+            install_desktop_entry()
+            QMessageBox.information(self, "Bilgi", "Talk-to-Write uygulama menüsüne başarıyla kaydedildi!")
+        self._update_desktop_status()
+
+    def _on_autostart_toggled(self, checked: bool) -> None:
+        set_autostart(checked)
+
     def _load_values(self) -> None:
         provider = self.config.get("provider", "gemini")
         idx = self.provider_combo.findData(provider)
@@ -239,6 +292,11 @@ class SettingsDialog(QDialog):
         self.sound_check.setChecked(self.config.get("sound_effects", True))
         self.restore_clip_check.setChecked(self.config.get("restore_clipboard", False))
 
+        self.autostart_check.blockSignals(True)
+        self.autostart_check.setChecked(is_autostart_enabled())
+        self.autostart_check.blockSignals(False)
+
+        self._update_desktop_status()
         self._on_provider_changed()
 
     def _save_and_close(self) -> None:
@@ -254,6 +312,8 @@ class SettingsDialog(QDialog):
 
         self.config.set("sound_effects", self.sound_check.isChecked())
         self.config.set("restore_clipboard", self.restore_clip_check.isChecked())
+
+        set_autostart(self.autostart_check.isChecked())
 
         self.config_updated.emit()
         self.accept()

@@ -8,7 +8,7 @@ import sys
 import threading
 from typing import Optional
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
 from .audio import AudioRecorder
 from .config import ConfigManager
@@ -23,11 +23,13 @@ from .ui.settings import SettingsDialog
 from .ui.tray import TrayIcon
 
 class WorkerSignals(QObject):
-    """Thread-safe signals for background transcription and injection."""
+    """Thread-safe signals for background transcription, injection, and IPC events."""
     level_changed = Signal(float)
     processing_done = Signal(str, float)
     processing_error = Signal(str)
     toggle_received = Signal()
+    notify_received = Signal()
+    settings_received = Signal()
 
 class TalkToWriteApp:
     """The central Talk-to-Write application."""
@@ -42,6 +44,8 @@ class TalkToWriteApp:
         self.signals.processing_done.connect(self._on_processing_success)
         self.signals.processing_error.connect(self._on_processing_error)
         self.signals.toggle_received.connect(self.toggle_recording)
+        self.signals.notify_received.connect(self._on_notify_running)
+        self.signals.settings_received.connect(self.open_settings)
 
         # Core Engines
         self.sound = SoundPlayer(enabled=self.config.get("sound_effects", True))
@@ -72,7 +76,9 @@ class TalkToWriteApp:
         # Hotkey & IPC listener
         self.hotkey_mgr = HotkeyManager(
             hotkey_str=self.config.get("hotkey", "Ctrl+Alt+Space"),
-            on_toggle=lambda: self.signals.toggle_received.emit()
+            on_toggle=lambda: self.signals.toggle_received.emit(),
+            on_notify_running=lambda: self.signals.notify_received.emit(),
+            on_open_settings=lambda: self.signals.settings_received.emit()
         )
         self.hotkey_mgr.start()
 
@@ -174,6 +180,15 @@ class TalkToWriteApp:
         self.config.set("mode", new_mode)
         self.pill.set_mode(new_mode)
 
+    def _on_notify_running(self) -> None:
+        hotkey = self.config.get("hotkey", "Ctrl+Alt+Space")
+        self.tray.showMessage(
+            "Talk-to-Write",
+            f"Uygulama zaten arka planda çalışıyor.\n🎙️ Dikte Kısayolu: {hotkey}",
+            QSystemTrayIcon.MessageIcon.Information,
+            3500
+        )
+
     def open_settings(self) -> None:
         if not self.settings_dialog:
             self.settings_dialog = SettingsDialog(self.config)
@@ -189,7 +204,9 @@ class TalkToWriteApp:
         self.hotkey_mgr.stop()
         self.hotkey_mgr = HotkeyManager(
             hotkey_str=self.config.get("hotkey", "Ctrl+Alt+Space"),
-            on_toggle=lambda: self.signals.toggle_received.emit()
+            on_toggle=lambda: self.signals.toggle_received.emit(),
+            on_notify_running=lambda: self.signals.notify_received.emit(),
+            on_open_settings=lambda: self.signals.settings_received.emit()
         )
         self.hotkey_mgr.start()
 

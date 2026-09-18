@@ -4,16 +4,32 @@ CLI and Desktop entry point for Talk-to-Write.
 
 import argparse
 import sys
+from pathlib import Path
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from . import __version__
 from .app import TalkToWriteApp
-from .hotkey import send_ipc_toggle
+from .desktop import (
+    ensure_desktop_installed,
+    get_project_root,
+    install_desktop_entry,
+    is_autostart_enabled,
+    is_desktop_installed,
+    set_autostart,
+    uninstall_desktop_entry,
+)
+from .hotkey import (
+    is_instance_running,
+    notify_running_instance,
+    open_running_settings,
+    send_ipc_toggle,
+)
 
 def main():
     parser = argparse.ArgumentParser(
         prog="talk-to-write",
-        description="Talk-to-Write: Ultra-fast dictation assistant for Linux."
+        description="Talk-to-Write: Ultra-fast AI voice dictation desktop assistant."
     )
     parser.add_argument(
         "--toggle",
@@ -21,14 +37,83 @@ def main():
         help="Send toggle trigger to running Talk-to-Write instance."
     )
     parser.add_argument(
+        "--settings",
+        action="store_true",
+        help="Open settings window on running instance."
+    )
+    parser.add_argument(
+        "--install",
+        action="store_true",
+        help="Register Talk-to-Write into OS Application Menu and install icons."
+    )
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Remove Talk-to-Write from OS Application Menu and remove icons."
+    )
+    parser.add_argument(
+        "--autostart",
+        choices=["on", "off", "status"],
+        help="Configure or check autostart on system boot."
+    )
+    parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Check status of running instance, desktop integration, and autostart."
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"Talk-to-Write {__version__}"
     )
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
-    # If --toggle was passed, trigger running instance via IPC and exit
+    # 1. Handle --install
+    if args.install:
+        success = install_desktop_entry()
+        if success:
+            print("[Talk-to-Write] ✓ Uygulama menüsüne başarıyla kaydedildi!")
+            print("  Artık Başlat / Uygulama Arama menüsünden 'Talk-to-Write' yazarak açabilirsiniz.")
+            sys.exit(0)
+        else:
+            print("[Talk-to-Write] ✗ Uygulama menüsüne kaydedilemedi.")
+            sys.exit(1)
+
+    # 2. Handle --uninstall
+    if args.uninstall:
+        success = uninstall_desktop_entry()
+        if success:
+            print("[Talk-to-Write] ✓ Uygulama menüsü kayıtları temizlendi.")
+            sys.exit(0)
+        else:
+            print("[Talk-to-Write] ✗ Kaldırma sırasında hata oluştu.")
+            sys.exit(1)
+
+    # 3. Handle --autostart
+    if args.autostart:
+        if args.autostart == "status":
+            enabled = is_autostart_enabled()
+            print(f"[Talk-to-Write] Başlangıçta çalıştırma (Autostart): {'Açık ✓' if enabled else 'Kapalı ✗'}")
+            sys.exit(0)
+        else:
+            enable = args.autostart == "on"
+            set_autostart(enable)
+            print(f"[Talk-to-Write] Başlangıçta çalıştırma {'açıldı ✓' if enable else 'kapatıldı ✗'}.")
+            sys.exit(0)
+
+    # 4. Handle --status
+    if args.status:
+        running = is_instance_running()
+        desktop = is_desktop_installed()
+        autostart = is_autostart_enabled()
+        print("Talk-to-Write Sistem Durumu:")
+        print(f"  • Çalışma durumu: {'Çalışıyor (Arka Planda) ✓' if running else 'Kapalı ✗'}")
+        print(f"  • Uygulama Menüsü: {'Kayıtlı ✓' if desktop else 'Kayıtlı Değil ✗'}")
+        print(f"  • Otomatik Başlatma (Autostart): {'Açık ✓' if autostart else 'Kapalı ✗'}")
+        sys.exit(0)
+
+    # 5. Handle --toggle
     if args.toggle:
         success = send_ipc_toggle()
         if success:
@@ -38,11 +123,40 @@ def main():
             print("[Talk-to-Write] Çalışan bir Talk-to-Write uygulaması bulunamadı. Lütfen önce uygulamayı başlatın.")
             sys.exit(1)
 
+    # 6. Handle --settings
+    if args.settings:
+        success = open_running_settings()
+        if success:
+            print("[Talk-to-Write] Ayarlar penceresi açıldı.")
+            sys.exit(0)
+        else:
+            print("[Talk-to-Write] Çalışan uygulama bulunamadı, ayarlar açılamıyor.")
+            sys.exit(1)
+
+    # 7. Single-Instance Guard
+    # If already running, do not spawn another GUI or collide on sockets; notify user and exit
+    if is_instance_running():
+        notify_running_instance()
+        print("[Talk-to-Write] Talk-to-Write zaten arka planda çalışıyor.")
+        print("  Dikteyi başlatmak için kısayolunuzu (Ctrl+Alt+Space) veya '--toggle' komutunu kullanabilirsiniz.")
+        sys.exit(0)
+
+    # Auto-register desktop entry on first GUI run
+    ensure_desktop_installed()
+
     # Launch GUI Application
     q_app = QApplication(sys.argv)
     q_app.setApplicationName("Talk-to-Write")
     q_app.setApplicationDisplayName("Talk-to-Write")
     q_app.setQuitOnLastWindowClosed(False)
+
+    # Set application icon
+    icon_svg = get_project_root() / "assets" / "talk-to-write.svg"
+    icon_png = get_project_root() / "assets" / "talk-to-write-256.png"
+    if icon_svg.exists():
+        q_app.setWindowIcon(QIcon(str(icon_svg)))
+    elif icon_png.exists():
+        q_app.setWindowIcon(QIcon(str(icon_png)))
 
     app = TalkToWriteApp(q_app)
 
