@@ -35,8 +35,8 @@ echo "📦 Bağımlılıklar yükleniyor/güncelleniyor..."
 .venv/bin/pip install -r requirements.txt -q
 .venv/bin/pip install -e . --no-deps -q
 
-# 4. Make launcher scripts executable
-chmod +x bin/talk-to-write update.sh install.sh install.command update.command 2>/dev/null || true
+# 4. Make launcher and lifecycle scripts executable
+chmod +x bin/talk-to-write update.sh install.sh uninstall.sh install.command update.command uninstall.command 2>/dev/null || true
 
 # 5. Register with Desktop Environment & Application Menu / Spotlight
 echo "🚀 Başlat Menüsü / Uygulama Arama entegrasyonu yapılıyor..."

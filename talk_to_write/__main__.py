@@ -16,6 +16,7 @@ from .desktop import (
     install_desktop_entry,
     is_autostart_enabled,
     is_desktop_installed,
+    purge_all,
     set_autostart,
     uninstall_desktop_entry,
 )
@@ -52,6 +53,11 @@ def main():
         help="Remove Talk-to-Write from OS Application Menu and remove icons."
     )
     parser.add_argument(
+        "--purge",
+        action="store_true",
+        help="Completely purge Talk-to-Write shortcuts, autostart, and configuration data."
+    )
+    parser.add_argument(
         "--autostart",
         choices=["on", "off", "status"],
         help="Configure or check autostart on system boot."
@@ -80,7 +86,17 @@ def main():
             print("[Talk-to-Write] ✗ Uygulama menüsüne kaydedilemedi.")
             sys.exit(1)
 
-    # 2. Handle --uninstall
+    # 2. Handle --purge
+    if args.purge:
+        success = purge_all(remove_config=True)
+        if success:
+            print("[Talk-to-Write] ✓ Uygulama menüsü, başlangıç kayıtları ve ayarlar tamamen temizlendi.")
+            sys.exit(0)
+        else:
+            print("[Talk-to-Write] ✗ Tam temizleme sırasında hata oluştu.")
+            sys.exit(1)
+
+    # 3. Handle --uninstall
     if args.uninstall:
         success = uninstall_desktop_entry()
         if success:

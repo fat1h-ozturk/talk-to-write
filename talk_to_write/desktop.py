@@ -356,3 +356,21 @@ def ensure_desktop_installed() -> None:
     if not is_desktop_installed():
         print("[Desktop] İlk çalıştırma algılandı: Talk-to-Write uygulama menüsüne kaydediliyor...")
         install_desktop_entry()
+
+def purge_all(remove_config: bool = True) -> bool:
+    """
+    Completely removes all system integration, autostart entries,
+    and optionally the user configuration directory.
+    """
+    success = uninstall_desktop_entry()
+    set_autostart(False)
+    if remove_config:
+        try:
+            from .config import get_config_dir
+            cfg = get_config_dir()
+            if cfg.exists():
+                shutil.rmtree(cfg, ignore_errors=True)
+        except Exception as e:
+            print(f"[Desktop] Error removing config dir: {e}")
+            success = False
+    return success
