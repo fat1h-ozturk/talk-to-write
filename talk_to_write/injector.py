@@ -151,15 +151,7 @@ class WindowsInjector(BaseInjector):
     """Windows text injector using native Win32 user32.dll and clipboard."""
 
     def get_current_clipboard(self) -> Optional[str]:
-        try:
-            from PySide6.QtGui import QGuiApplication
-            if QGuiApplication.instance():
-                clip = QGuiApplication.clipboard()
-                if clip:
-                    return clip.text()
-        except Exception:
-            pass
-
+        """Reads text from Windows clipboard via Win32 API (thread-safe)."""
         try:
             import ctypes
             CF_UNICODETEXT = 13
@@ -172,33 +164,30 @@ class WindowsInjector(BaseInjector):
             kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
             kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
 
-            if not user32.OpenClipboard(None):
+            # Retry up to 5 times in case another app holds the clipboard
+            for _ in range(5):
+                if user32.OpenClipboard(None):
+                    break
+                time.sleep(0.03)
+            else:
                 return None
-            h_data = user32.GetClipboardData(CF_UNICODETEXT)
-            text = None
-            if h_data:
-                p_data = kernel32.GlobalLock(h_data)
-                if p_data:
-                    text = ctypes.c_wchar_p(p_data).value
-                    kernel32.GlobalUnlock(h_data)
-            user32.CloseClipboard()
-            return text
+
+            try:
+                h_data = user32.GetClipboardData(CF_UNICODETEXT)
+                text = None
+                if h_data:
+                    p_data = kernel32.GlobalLock(h_data)
+                    if p_data:
+                        text = ctypes.c_wchar_p(p_data).value
+                        kernel32.GlobalUnlock(h_data)
+                return text
+            finally:
+                user32.CloseClipboard()
         except Exception:
             return None
 
     def set_clipboard(self, text: str) -> bool:
-        # Try PySide6 clipboard first if QApplication exists
-        try:
-            from PySide6.QtGui import QGuiApplication
-            if QGuiApplication.instance():
-                clip = QGuiApplication.clipboard()
-                if clip:
-                    clip.setText(text)
-                    return True
-        except Exception:
-            pass
-
-        # Native Win32 OpenClipboard fallback
+        """Sets text onto Windows system clipboard via native Win32 API (thread-safe)."""
         try:
             import ctypes
             CF_UNICODETEXT = 13
@@ -214,35 +203,55 @@ class WindowsInjector(BaseInjector):
             user32.SetClipboardData.restype = ctypes.c_void_p
             user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
 
-            if not user32.OpenClipboard(None):
+            # Retry up to 10 times in case clipboard is temporarily locked
+            for _ in range(10):
+                if user32.OpenClipboard(None):
+                    break
+                time.sleep(0.03)
+            else:
+                print("[WindowsInjector] Could not open clipboard (locked by another process).")
                 return False
-            user32.EmptyClipboard()
-            encoded = text.encode("utf-16-le") + b"\x00\x00"
-            h_mem = kernel32.GlobalAlloc(0x0042, len(encoded))  # GMEM_MOVEABLE | GMEM_ZEROINIT
-            if h_mem:
-                p_mem = kernel32.GlobalLock(h_mem)
-                if p_mem:
-                    ctypes.memmove(p_mem, encoded, len(encoded))
-                    kernel32.GlobalUnlock(h_mem)
-                    user32.SetClipboardData(CF_UNICODETEXT, h_mem)
-            user32.CloseClipboard()
-            return True
+
+            try:
+                user32.EmptyClipboard()
+                encoded = text.encode("utf-16-le") + b"\x00\x00"
+                h_mem = kernel32.GlobalAlloc(0x0042, len(encoded))  # GMEM_MOVEABLE | GMEM_ZEROINIT
+                if h_mem:
+                    p_mem = kernel32.GlobalLock(h_mem)
+                    if p_mem:
+                        ctypes.memmove(p_mem, encoded, len(encoded))
+                        kernel32.GlobalUnlock(h_mem)
+                        res = user32.SetClipboardData(CF_UNICODETEXT, h_mem)
+                        return bool(res)
+                return False
+            finally:
+                user32.CloseClipboard()
         except Exception as e:
             print(f"[WindowsInjector] Clipboard error: {e}")
             return False
 
     def simulate_paste(self) -> bool:
+        """Synthesizes Ctrl+V paste into currently focused window."""
         try:
             import ctypes
             VK_CONTROL = 0x11
+            VK_MENU = 0x12  # Alt
+            VK_SPACE = 0x20
             VK_V = 0x56
             KEYEVENTF_KEYUP = 0x0002
 
             user32 = ctypes.windll.user32
+
+            # Ensure modifier keys from shortcut (Alt, Space) are released before Ctrl+V
+            user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
+            user32.keybd_event(VK_SPACE, 0, KEYEVENTF_KEYUP, 0)
+            time.sleep(0.02)
+
             # Key down: Ctrl + V
             user32.keybd_event(VK_CONTROL, 0, 0, 0)
             user32.keybd_event(VK_V, 0, 0, 0)
             time.sleep(0.02)
+
             # Key up: V + Ctrl
             user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
             user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)

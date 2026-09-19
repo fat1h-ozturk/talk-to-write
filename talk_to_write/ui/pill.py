@@ -69,13 +69,6 @@ class FloatingPill(QWidget):
             except Exception:
                 pass
 
-        # Drop shadow for depth
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(24)
-        shadow.setColor(QColor(0, 0, 0, 140))
-        shadow.setOffset(0, 4)
-        self.setGraphicsEffect(shadow)
-
         # State management
         self.state = "hidden"  # "recording", "processing", "success", "error", "hidden"
         self.mode = "dictation"
@@ -126,15 +119,15 @@ class FloatingPill(QWidget):
         self.status_message = "Dinleniyor..."
         self.show()
         self.raise_()
-        self.update()
+        self.repaint()
 
     def show_processing(self) -> None:
         self._hide_timer.stop()
         self.state = "processing"
-        self.status_message = "Dönüştürülüyor..."
+        self.status_message = "İşleniyor..."
         self.show()
         self.raise_()
-        self.update()
+        self.repaint()
 
     def show_success(self, latency: float = 0.0) -> None:
         self.state = "success"
@@ -144,7 +137,7 @@ class FloatingPill(QWidget):
             self.status_message = "Yapıştırıldı!"
         self.show()
         self.raise_()
-        self.update()
+        self.repaint()
         self._hide_timer.start(1600)
 
     def show_error(self, message: str) -> None:
@@ -152,7 +145,7 @@ class FloatingPill(QWidget):
         self.status_message = message[:28] + ("..." if len(message) > 28 else "")
         self.show()
         self.raise_()
-        self.update()
+        self.repaint()
         self._hide_timer.start(3500)
 
     def hide_pill(self) -> None:
@@ -199,6 +192,12 @@ class FloatingPill(QWidget):
 
         rect = QRectF(4, 4, self.width() - 8, self.height() - 8)
         radius = rect.height() / 2.0
+
+        # Draw soft shadow inside widget bounds
+        shadow_rect = QRectF(4, 6, self.width() - 8, self.height() - 8)
+        shadow_path = QPainterPath()
+        shadow_path.addRoundedRect(shadow_rect, radius, radius)
+        painter.fillPath(shadow_path, QBrush(QColor(0, 0, 0, 90)))
 
         # Draw Background Capsule
         bg_path = QPainterPath()

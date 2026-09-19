@@ -130,15 +130,18 @@ class TalkToWriteApp:
             self.sound.play("stop")
             self.pill.show_processing()
             self.tray.set_recording(False)
+            self.is_busy_processing = True
+            self.q_app.processEvents()
+
             audio_bytes = self.recorder.stop_recording()
 
             if not audio_bytes or len(audio_bytes) < 3200:  # < 0.1s
                 print("[App] Çok kısa ses veya ses algılanamadı.")
+                self.is_busy_processing = False
                 self.sound.play("error")
                 self.pill.show_error("Ses algılanamadı.")
                 return
 
-            self.is_busy_processing = True
             threading.Thread(target=self._process_audio_worker, args=(audio_bytes,), daemon=True).start()
 
     def _process_audio_worker(self, audio_bytes: bytes) -> None:
