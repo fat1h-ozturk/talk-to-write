@@ -139,17 +139,72 @@ def _get_windows_startup_dir() -> Optional[Path]:
         return None
     return programs / "Startup"
 
-def _create_windows_shortcut(target: Path, shortcut_path: Path, description: str = "Talk-to-Write") -> bool:
+def _ensure_windows_ico() -> Optional[Path]:
+    """Ensures a Windows .ico icon exists in assets/ directory."""
+    root = get_project_root()
+    ico_path = root / "assets" / "talk-to-write.ico"
+    if ico_path.exists():
+        return ico_path
+    png_path = root / "assets" / "talk-to-write-256.png"
+    if png_path.exists():
+        try:
+            from PySide6.QtGui import QImage
+            img = QImage(str(png_path))
+            if not img.isNull():
+                img.save(str(ico_path))
+                return ico_path
+        except Exception:
+            pass
+    return None
+
+def _get_windows_gui_launcher() -> tuple[Path, str]:
+    """
+    Returns (target, arguments) for launching Talk-to-Write
+    silently without a console window on Windows.
+    Prefers pythonw.exe so no terminal/command prompt window ever appears.
+    """
+    root = get_project_root()
+    # 1. Prefer pythonw.exe in project .venv
+    venv_pythonw = root / ".venv" / "Scripts" / "pythonw.exe"
+    if venv_pythonw.exists():
+        return venv_pythonw.resolve(), "-m talk_to_write"
+
+    # 2. Check current interpreter's pythonw.exe
+    curr_pythonw = Path(sys.executable).parent / "pythonw.exe"
+    if curr_pythonw.exists():
+        return curr_pythonw.resolve(), "-m talk_to_write"
+
+    # 3. Fallback to bat launcher
+    bat_launcher = root / "bin" / "talk-to-write.bat"
+    if bat_launcher.exists():
+        return bat_launcher.resolve(), ""
+
+    return Path(sys.executable).resolve(), "-m talk_to_write"
+
+def _create_windows_shortcut(
+    target: Path,
+    shortcut_path: Path,
+    arguments: str = "",
+    working_dir: Optional[Path] = None,
+    icon_path: Optional[Path] = None,
+    description: str = "Talk-to-Write"
+) -> bool:
     """Creates a Windows .lnk shortcut using PowerShell."""
     shortcut_path.parent.mkdir(parents=True, exist_ok=True)
-    ps_command = (
-        f"$ws = New-Object -ComObject WScript.Shell; "
-        f"$s = $ws.CreateShortcut('{str(shortcut_path)}'); "
-        f"$s.TargetPath = '{str(target)}'; "
-        f"$s.WorkingDirectory = '{str(target.parent)}'; "
-        f"$s.Description = '{description}'; "
-        f"$s.Save()"
-    )
+    w_dir = working_dir if working_dir else target.parent
+    ps_lines = [
+        "$ws = New-Object -ComObject WScript.Shell;",
+        f"$s = $ws.CreateShortcut('{str(shortcut_path)}');",
+        f"$s.TargetPath = '{str(target)}';",
+        f"$s.WorkingDirectory = '{str(w_dir)}';",
+        f"$s.Description = '{description}';",
+    ]
+    if arguments:
+        ps_lines.append(f"$s.Arguments = '{arguments}';")
+    if icon_path and icon_path.exists():
+        ps_lines.append(f"$s.IconLocation = '{str(icon_path)}';")
+    ps_lines.append("$s.Save()")
+    ps_command = " ".join(ps_lines)
     try:
         res = subprocess.run(["powershell", "-NoProfile", "-Command", ps_command], capture_output=True)
         return res.returncode == 0
@@ -252,8 +307,17 @@ def install_desktop_entry() -> bool:
             programs = _get_windows_programs_dir()
             if not programs:
                 return False
-            launcher = get_launcher_path()
-            return _create_windows_shortcut(launcher, programs / "Talk-to-Write.lnk")
+            launcher, args = _get_windows_gui_launcher()
+            root = get_project_root()
+            ico = _ensure_windows_ico()
+            return _create_windows_shortcut(
+                launcher,
+                programs / "Talk-to-Write.lnk",
+                arguments=args,
+                working_dir=root,
+                icon_path=ico,
+                description="Talk-to-Write: Sesli Dikte Asistanı"
+            )
         elif sys.platform.startswith("darwin"):
             return _install_mac_app()
         else:
@@ -303,8 +367,17 @@ def set_autostart(enable: bool) -> bool:
                 return False
             lnk_path = startup / "Talk-to-Write.lnk"
             if enable:
-                launcher = get_launcher_path()
-                return _create_windows_shortcut(launcher, lnk_path)
+                launcher, args = _get_windows_gui_launcher()
+                root = get_project_root()
+                ico = _ensure_windows_ico()
+                return _create_windows_shortcut(
+                    launcher,
+                    lnk_path,
+                    arguments=args,
+                    working_dir=root,
+                    icon_path=ico,
+                    description="Talk-to-Write: Sesli Dikte Asistanı"
+                )
             else:
                 if lnk_path.exists():
                     lnk_path.unlink()
