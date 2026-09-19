@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM ==============================================================================
 REM Talk-to-Write: One-Click Windows Update Script
 REM Pulls latest changes from Git, updates dependencies, and refreshes shortcut.

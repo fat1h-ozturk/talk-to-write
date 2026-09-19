@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 rem Launcher script for Talk-to-Write on Windows
 
 setlocal

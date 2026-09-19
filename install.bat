@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul 2>&1
 REM ==============================================================================
 REM Talk-to-Write: One-Click Windows Setup & Start Menu Registration Script
