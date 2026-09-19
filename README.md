@@ -237,8 +237,3 @@ Tüm platform adaptörlerini ve birim testleri doğrulamak için:
 pytest -v
 ```
 
----
-
-## 📄 Lisans
-
-Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır. Katkıda bulunmaktan ve geliştirmekten çekinmeyin!
