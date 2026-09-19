@@ -155,10 +155,11 @@ def main():
             sys.exit(1)
 
     # 7. Single-Instance Guard
-    # If already running, do not spawn another GUI or collide on sockets; notify user and exit
+    # If already running, bring up settings window to show the user it's alive, notify and exit
     if is_instance_running():
+        open_running_settings()
         notify_running_instance()
-        print("[Talk-to-Write] Talk-to-Write zaten arka planda çalışıyor.")
+        print("[Talk-to-Write] Talk-to-Write zaten arka planda çalışıyor. Ayarlar penceresi açıldı.")
         print("  Dikteyi başlatmak için kısayolunuzu (Ctrl+Alt+Space) veya '--toggle' komutunu kullanabilirsiniz.")
         sys.exit(0)
 

@@ -35,6 +35,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "sound_effects": True,
     "language": "auto",  # "auto", "tr", "en"
     "restore_clipboard": False,
+    "input_device_index": -1,
     "pill_x": -1,
     "pill_y": -1,
 }
