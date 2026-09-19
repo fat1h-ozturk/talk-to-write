@@ -83,6 +83,12 @@ Projeye yeni bir özellik veya hata düzeltmesi geldiğinde tek komutla güncell
 ### 5. Başlatın
 - **Başlat Menüsü / KRunner:** Süper (Windows) tuşuna basıp `Talk-to-Write` veya `Dikte` yazarak açabilirsiniz.
 - **Terminalden:** `./bin/talk-to-write`
+
+### 6. Sistemden Tamamen Nasıl Kaldırılır? (Uninstall)
+Uygulamayı, menü kayıtlarını, simgeleri, ayarları ve sanal ortamı temizlemek için:
+```bash
+./uninstall.sh
+```
 </details>
 
 <details>
@@ -127,6 +133,16 @@ Projeye yeni bir özellik veya doğruluk iyileştirmesi geldiğinde:
 ### 4. Başlatın
 - **Windows Başlat Menüsü:** Klavyenizdeki Windows tuşuna basıp `Talk-to-Write` yazarak uygulamayı açabilirsiniz.
 - **Komut Satırından:** `bin\talk-to-write.bat`
+
+### 5. Sistemden Tamamen Nasıl Kaldırılır? (Uninstall)
+Uygulamayı, Başlat Menüsü/Başlangıç kısayollarını, ayarları ve sanal ortamı temizlemek için:
+- **Yöntem 1 (Tek Tıkla):** Klasördeki **`uninstall.bat`** dosyasına çift tıklayın.
+- **Yöntem 2 (Terminal):**
+  ```cmd
+  cd talk-to-write
+  uninstall.bat
+  ```
+*(İsteğe bağlı olarak proje klasörünü de tamamen silmek isteyip istemediğinizi sorar).*
 </details>
 
 <details>
@@ -170,6 +186,11 @@ Yeni güncellemeleri almak için:
 > macOS güvenlik kuralları gereği, uygulamanın mikrofonu dinleyebilmesi ve aktif pencereye `Cmd+V` yapıştırma simülasyonu gönderebilmesi için **Sistem Ayarları -> Gizlilik ve Güvenlik** altından:
 > 1. **Mikrofon (Microphone):** Terminal / Talk-to-Write için izin verin.
 > 2. **Erişilebilirlik (Accessibility):** Terminal / Talk-to-Write için izin verin.
+
+### 5. Sistemden Tamamen Nasıl Kaldırılır? (Uninstall)
+Uygulamayı, `.app` paketini, Spotlight kaydını, LaunchAgent ve ayarları temizlemek için:
+- **Finder'dan Çift Tık:** Klasördeki **`uninstall.command`** dosyasına çift tıklayın.
+- **Terminalden:** `./uninstall.sh`
 
 </details>
 
