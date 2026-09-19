@@ -193,17 +193,16 @@ def detach_windows_console() -> None:
             # Detach this process from the console
             kernel32.FreeConsole()
 
-        # Safely redirect standard streams to devnull
-        if sys.stdout is None or not hasattr(sys.stdout, "closed") or not sys.stdout.closed:
-            try:
-                sys.stdout = open(os.devnull, "w", encoding="utf-8")
-            except Exception:
-                pass
-        if sys.stderr is None or not hasattr(sys.stderr, "closed") or not sys.stderr.closed:
-            try:
-                sys.stderr = open(os.devnull, "w", encoding="utf-8")
-            except Exception:
-                pass
+        # Safely redirect standard streams to a log file in config directory
+        try:
+            from .config import get_config_dir
+            log_dir = get_config_dir()
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = open(log_dir / "app.log", "a", encoding="utf-8")
+            sys.stdout = log_file
+            sys.stderr = log_file
+        except Exception:
+            pass
     except Exception:
         pass
 

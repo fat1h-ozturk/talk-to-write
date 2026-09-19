@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..audio import get_input_devices
 from ..config import ConfigManager
 from ..desktop import (
     install_desktop_entry,
@@ -195,7 +196,31 @@ class SettingsDialog(QDialog):
 
         main_layout.addWidget(trigger_group)
 
-        # 3. Custom Vocabulary
+        # 3. Audio & Microphone Group
+        audio_group = QGroupBox("Mikrofon ve Ses Girişi")
+        audio_layout = QFormLayout(audio_group)
+        audio_layout.setSpacing(8)
+
+        self.mic_combo = QComboBox()
+        self.mic_combo.addItem("Varsayılan Sistem Mikrofonu", -1)
+        for dev in get_input_devices():
+            dev_label = f"{dev['name']} {'(Varsayılan)' if dev.get('is_default') else ''}"
+            self.mic_combo.addItem(dev_label, dev["index"])
+        audio_layout.addRow("Mikrofon:", self.mic_combo)
+
+        test_mic_layout = QHBoxLayout()
+        self.test_mic_btn = QPushButton("🎙️ Mikrofonu Test Et (2 sn)")
+        self.test_mic_btn.clicked.connect(self._test_microphone)
+        self.mic_status_lbl = QLabel("Ses testi için butona tıklayın ve konuşun.")
+        self.mic_status_lbl.setStyleSheet("color: #a1a1aa; font-size: 11px;")
+        test_mic_layout.addWidget(self.test_mic_btn)
+        test_mic_layout.addWidget(self.mic_status_lbl)
+        test_mic_layout.addStretch()
+        audio_layout.addRow("", test_mic_layout)
+
+        main_layout.addWidget(audio_group)
+
+        # 4. Custom Vocabulary
         vocab_group = QGroupBox("Özel Kelime Dağarcığı (Custom Vocabulary)")
         vocab_layout = QVBoxLayout(vocab_group)
         vocab_info = QLabel("Sık kullandığınız isimler, teknik terimler ve kodlama kütüphaneleri (virgülle ayırın):")
@@ -326,6 +351,11 @@ class SettingsDialog(QDialog):
         if lang_idx >= 0:
             self.language_combo.setCurrentIndex(lang_idx)
 
+        dev_idx = self.config.get("input_device_index", -1)
+        found_idx = self.mic_combo.findData(dev_idx)
+        if found_idx >= 0:
+            self.mic_combo.setCurrentIndex(found_idx)
+
         self.hotkey_edit.setText(self.config.get("hotkey", "Ctrl+Alt+Space"))
 
         vocab = self.config.get("custom_vocabulary", [])
@@ -349,6 +379,7 @@ class SettingsDialog(QDialog):
         self.config.set("groq_stt_model", self.groq_stt_combo.currentData())
         self.config.set("groq_llm_model", self.groq_llm_combo.currentData())
         self.config.set("language", self.language_combo.currentData())
+        self.config.set("input_device_index", self.mic_combo.currentData())
         self.config.set("hotkey", self.hotkey_edit.text().strip())
 
         raw_vocab = self.vocab_edit.text().split(",")
@@ -362,6 +393,55 @@ class SettingsDialog(QDialog):
 
         self.config_updated.emit()
         self.accept()
+
+    def _test_microphone(self) -> None:
+        import pyaudio, struct, math
+        dev_idx = self.mic_combo.currentData()
+        self.test_mic_btn.setEnabled(False)
+        self.mic_status_lbl.setText("Dinleniyor... Lütfen mikrofona konuşun...")
+        self.mic_status_lbl.setStyleSheet("color: #60a5fa; font-size: 11px; font-weight: bold;")
+        self.repaint()
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
+
+        p = pyaudio.PyAudio()
+        try:
+            stream_kwargs = {
+                "format": pyaudio.paInt16,
+                "channels": 1,
+                "rate": 16000,
+                "input": True,
+                "frames_per_buffer": 1024
+            }
+            if dev_idx is not None and dev_idx >= 0:
+                stream_kwargs["input_device_index"] = dev_idx
+
+            stream = p.open(**stream_kwargs)
+            max_rms = 0.0
+            for _ in range(30):  # ~2 seconds
+                data = stream.read(1024, exception_on_overflow=False)
+                shorts = struct.unpack(f"{len(data)//2}h", data)
+                if shorts:
+                    sum_sq = sum(s * s for s in shorts)
+                    rms = math.sqrt(sum_sq / len(shorts)) / 32768.0
+                    if rms > max_rms:
+                        max_rms = rms
+                QApplication.processEvents()
+            stream.stop_stream()
+            stream.close()
+
+            if max_rms > 0.0008:
+                self.mic_status_lbl.setText(f"✓ Ses başarıyla algılandı! (Seviye: {max_rms:.4f})")
+                self.mic_status_lbl.setStyleSheet("color: #4ade80; font-size: 11px; font-weight: bold;")
+            else:
+                self.mic_status_lbl.setText(f"⚠️ Ses çok kısık veya algılanamadı ({max_rms:.5f}). Mikrofonu/ses düzeyini kontrol edin.")
+                self.mic_status_lbl.setStyleSheet("color: #f87171; font-size: 11px; font-weight: bold;")
+        except Exception as e:
+            self.mic_status_lbl.setText(f"Mikrofon açılamadı: {e}")
+            self.mic_status_lbl.setStyleSheet("color: #f87171; font-size: 11px;")
+        finally:
+            p.terminate()
+            self.test_mic_btn.setEnabled(True)
 
     def _test_injection(self) -> None:
         from ..injector import TextInjector

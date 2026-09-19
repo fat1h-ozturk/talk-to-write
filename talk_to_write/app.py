@@ -7,7 +7,7 @@ import os
 import sys
 import threading
 from typing import Optional
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, QTimer
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
 from .audio import AudioRecorder
@@ -51,7 +51,8 @@ class TalkToWriteApp:
         self.sound = SoundPlayer(enabled=self.config.get("sound_effects", True))
         self.injector = TextInjector(restore_clipboard=self.config.get("restore_clipboard", False))
         self.recorder = AudioRecorder(
-            on_level_callback=lambda lvl: self.signals.level_changed.emit(lvl)
+            on_level_callback=lambda lvl: self.signals.level_changed.emit(lvl),
+            device_index=self.config.get("input_device_index", -1)
         )
 
         # UI Components: Use Wayland Layer Shell overlay (guarantees zero focus loss) if available
@@ -87,6 +88,10 @@ class TalkToWriteApp:
         # Lazy-initialized AI service singletons (avoids re-creating per request)
         self._gemini_service: Optional[GeminiService] = None
         self._groq_service: Optional[GroqService] = None
+
+        # Guide user: if API key is not configured yet, open Settings on first run
+        if not self.config.get_api_key():
+            QTimer.singleShot(400, self.open_settings)
 
     def _get_gemini_service(self) -> GeminiService:
         """Returns a cached GeminiService, recreating only if config changed."""
@@ -212,6 +217,7 @@ class TalkToWriteApp:
             QSystemTrayIcon.MessageIcon.Information,
             3500
         )
+        self.open_settings()
 
     def open_settings(self) -> None:
         if not self.settings_dialog:
@@ -224,6 +230,14 @@ class TalkToWriteApp:
     def _on_config_updated(self) -> None:
         self.sound.enabled = self.config.get("sound_effects", True)
         self.injector.restore_clipboard = self.config.get("restore_clipboard", False)
+        # Update audio input device if changed
+        new_dev_idx = self.config.get("input_device_index", -1)
+        if getattr(self.recorder, "device_index", -1) != new_dev_idx:
+            self.recorder.terminate()
+            self.recorder = AudioRecorder(
+                on_level_callback=lambda lvl: self.signals.level_changed.emit(lvl),
+                device_index=new_dev_idx
+            )
         # Invalidate cached services so they pick up new config on next use
         self._gemini_service = None
         self._groq_service = None

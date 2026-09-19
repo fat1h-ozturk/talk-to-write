@@ -42,6 +42,37 @@ def no_alsa_err():
         yield
 
 
+def get_input_devices() -> list:
+    """Returns available audio input devices for configuration."""
+    devices = []
+    try:
+        with no_alsa_err():
+            pa = pyaudio.PyAudio()
+            default_index = -1
+            try:
+                def_info = pa.get_default_input_device_info()
+                default_index = def_info.get("index", -1)
+            except Exception:
+                pass
+
+            for i in range(pa.get_device_count()):
+                try:
+                    info = pa.get_device_info_by_index(i)
+                    # Filter for input devices on primary host API (MME on Windows, ALSA on Linux)
+                    if info.get("maxInputChannels", 0) > 0 and info.get("hostApi") == 0:
+                        devices.append({
+                            "index": i,
+                            "name": info.get("name"),
+                            "is_default": (i == default_index)
+                        })
+                except Exception:
+                    pass
+            pa.terminate()
+    except Exception:
+        pass
+    return devices
+
+
 class AudioRecorder:
     """Manages audio capture with real-time level metering, warm device caching, and VAD."""
 
@@ -50,15 +81,16 @@ class AudioRecorder:
     CHUNK_SIZE = 1024
     FORMAT = pyaudio.paInt16
 
-    def __init__(self, on_level_callback: Optional[Callable[[float], None]] = None):
+    def __init__(self, on_level_callback: Optional[Callable[[float], None]] = None, device_index: int = -1):
         self.on_level_callback = on_level_callback
+        self.device_index = device_index
         self.is_recording = False
         self._thread: Optional[threading.Thread] = None
         self._frames = []
         self._lock = threading.Lock()
         self._pyaudio: Optional[pyaudio.PyAudio] = None
         self._stream: Optional[pyaudio.Stream] = None
-        self._vad = webrtcvad.Vad(2) if _HAS_WEBRTC_VAD else None
+        self._vad = webrtcvad.Vad(1) if _HAS_WEBRTC_VAD else None  # Mode 1 is more tolerant than 2
         # Warm-up PyAudio once on initialization to eliminate ALSA probe latency
         self._ensure_pyaudio()
 
@@ -105,14 +137,18 @@ class AudioRecorder:
             if not pa:
                 return
 
+            stream_kwargs = {
+                "format": self.FORMAT,
+                "channels": self.CHANNELS,
+                "rate": self.SAMPLE_RATE,
+                "input": True,
+                "frames_per_buffer": self.CHUNK_SIZE
+            }
+            if self.device_index is not None and self.device_index >= 0:
+                stream_kwargs["input_device_index"] = self.device_index
+
             with no_alsa_err():
-                self._stream = pa.open(
-                    format=self.FORMAT,
-                    channels=self.CHANNELS,
-                    rate=self.SAMPLE_RATE,
-                    input=True,
-                    frames_per_buffer=self.CHUNK_SIZE
-                )
+                self._stream = pa.open(**stream_kwargs)
 
             while True:
                 with self._lock:
@@ -188,8 +224,8 @@ class AudioRecorder:
             speech_flags.append(is_speech)
 
         if not any(speech_flags):
-            print("[Audio] VAD: Kayıtta herhangi bir insan sesi algılanamadı.")
-            return b""
+            print("[Audio] VAD: Belirgin konuşma bayrağı bulunamadı, ham ses korunuyor.")
+            return raw_pcm
 
         first_speech_idx = speech_flags.index(True)
         last_speech_idx = len(speech_flags) - 1 - speech_flags[::-1].index(True)
@@ -229,9 +265,9 @@ class AudioRecorder:
         try:
             samples = struct.unpack(f"<{count}h", raw_bytes)
             peak = max(abs(s) for s in samples) if samples else 0
-            if peak > 80 and peak < target_peak:
-                # Limit max gain to 4.0x to avoid over-amplifying low background hiss
-                gain = min(4.0, target_peak / peak)
+            if peak > 20 and peak < target_peak:
+                # Limit max gain to 12.0x for very quiet mics
+                gain = min(12.0, target_peak / peak)
                 norm_samples = [max(-32768, min(32767, int(s * gain))) for s in samples]
                 return struct.pack(f"<{count}h", *norm_samples)
         except Exception:
@@ -253,12 +289,12 @@ class AudioRecorder:
         # 1. WebRTC VAD Silence Trimming (lead-in & lead-out dead silence removal)
         speech_pcm = self._trim_silence_vad(raw_pcm)
         if not speech_pcm:
-            return b""
+            speech_pcm = raw_pcm
 
-        # 2. RMS-based noise floor check
+        # 2. RMS-based noise floor check (tolerates quiet/distant microphones)
         rms = self._compute_rms(speech_pcm)
-        if rms < 0.005:  # ~-46 dBFS threshold
-            print(f"[Audio] RMS {rms:.4f} ses eşiğinin altında, atlanıyor.")
+        if rms < 0.0001:  # Absolute silence / completely disconnected mic
+            print(f"[Audio] RMS {rms:.5f} mutlak sessizlik seviyesinde, atlanıyor.")
             return b""
 
         # 3. Peak volume normalization on actual speech
