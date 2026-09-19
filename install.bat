@@ -1,32 +1,78 @@
 @echo off
+chcp 65001 >nul 2>&1
 REM ==============================================================================
 REM Talk-to-Write: One-Click Windows Setup & Start Menu Registration Script
 REM ==============================================================================
+
+cd /d "%~dp0"
 
 echo ======================================================
 echo Talk-to-Write Windows Kurulum Sihirbazi
 echo ======================================================
 
-where python >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [HATA] Python bulunamadi! Lutfen Python 3.9 veya ustunu yukleyin ve PATH'e ekleyin.
+REM 1. En uygun Python surumunu tespit et (PyAudio ve ses kutuphaneleri icin 3.10-3.13 tercih edilir)
+set "PY_CMD="
+
+py -3.13 --version >nul 2>&1
+if not errorlevel 1 set "PY_CMD=py -3.13"
+
+if not defined PY_CMD (
+    py -3.12 --version >nul 2>&1
+    if not errorlevel 1 set "PY_CMD=py -3.12"
+)
+
+if not defined PY_CMD (
+    py -3.11 --version >nul 2>&1
+    if not errorlevel 1 set "PY_CMD=py -3.11"
+)
+
+if not defined PY_CMD (
+    py -3.10 --version >nul 2>&1
+    if not errorlevel 1 set "PY_CMD=py -3.10"
+)
+
+if not defined PY_CMD (
+    where python >nul 2>&1
+    if not errorlevel 1 set "PY_CMD=python"
+)
+
+if not defined PY_CMD (
+    echo [HATA] Python bulunamadi! Lutfen Python 3.10 veya ustunu yukleyin ve PATH'e ekleyin.
     pause
     exit /b 1
 )
 
+echo [BILGI] Kullanilan Python: %PY_CMD%
+
 if not exist ".venv" (
-    echo [BILGI] Sanal ortam (.venv) olusturuluyor...
-    python -m venv .venv
+    echo [BILGI] Sanal ortam .venv olusturuluyor...
+    %PY_CMD% -m venv .venv
+    if errorlevel 1 (
+        echo [HATA] Sanal ortam olusturulamadi!
+        pause
+        exit /b 1
+    )
 )
 
 echo [BILGI] Bagimliliklar yukleniyor...
 call .venv\Scripts\activate.bat
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install -e . --no-deps
+call python -m pip install --upgrade pip
+call python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo [HATA] Bagimliliklar yuklenirken bir sorun olustu.
+    pause
+    exit /b 1
+)
+
+call python -m pip install -e . --no-deps
+if errorlevel 1 (
+    echo [HATA] Paket gelistirme modunda yuklenemedi.
+    pause
+    exit /b 1
+)
 
 echo [BILGI] Baslat Menusune kisayol ekleniyor...
-python -m talk_to_write --install
+call python -m talk_to_write --install
 
 echo ======================================================
 echo Kurulum Tamamlandi!

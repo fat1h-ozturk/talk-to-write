@@ -43,7 +43,10 @@ def test_desktop_entry_content():
     assert "Keywords=" in content
     assert "dikte" in content
 
-def test_autostart_toggle_linux(tmp_path):
+import sys
+
+def test_autostart_toggle_linux(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "platform", "linux")
     fake_autostart = tmp_path / "autostart" / "talk-to-write.desktop"
     with patch("talk_to_write.desktop._get_linux_autostart_path", return_value=fake_autostart):
         # Initial: not enabled
@@ -59,7 +62,8 @@ def test_autostart_toggle_linux(tmp_path):
         assert not fake_autostart.exists()
         assert not is_autostart_enabled()
 
-def test_desktop_install_uninstall(tmp_path):
+def test_desktop_install_uninstall_linux(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "platform", "linux")
     fake_desktop = tmp_path / "applications" / "talk-to-write.desktop"
     with patch("talk_to_write.desktop._get_linux_desktop_path", return_value=fake_desktop), \
          patch("talk_to_write.desktop._install_linux_icons"), \
@@ -72,6 +76,22 @@ def test_desktop_install_uninstall(tmp_path):
 
         assert uninstall_desktop_entry()
         assert not fake_desktop.exists()
+
+def test_autostart_toggle_windows(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "platform", "win32")
+    fake_startup = tmp_path / "Startup"
+    fake_startup.mkdir(parents=True, exist_ok=True)
+    with patch("talk_to_write.desktop._get_windows_startup_dir", return_value=fake_startup), \
+         patch("talk_to_write.desktop._create_windows_shortcut", side_effect=lambda tgt, sc, **kw: sc.touch() or True):
+
+        assert not is_autostart_enabled()
+        assert set_autostart(True)
+        assert (fake_startup / "Talk-to-Write.lnk").exists()
+        assert is_autostart_enabled()
+
+        assert set_autostart(False)
+        assert not (fake_startup / "Talk-to-Write.lnk").exists()
+        assert not is_autostart_enabled()
 
 def test_single_instance_ipc(tmp_path):
     test_sock = str(tmp_path / "test-talk-to-write.sock")

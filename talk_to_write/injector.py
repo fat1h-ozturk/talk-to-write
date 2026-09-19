@@ -153,31 +153,66 @@ class WindowsInjector(BaseInjector):
     def get_current_clipboard(self) -> Optional[str]:
         try:
             from PySide6.QtGui import QGuiApplication
-            clip = QGuiApplication.clipboard()
-            if clip:
-                return clip.text()
+            if QGuiApplication.instance():
+                clip = QGuiApplication.clipboard()
+                if clip:
+                    return clip.text()
         except Exception:
             pass
-        return None
+
+        try:
+            import ctypes
+            CF_UNICODETEXT = 13
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+            user32.OpenClipboard.argtypes = [ctypes.c_void_p]
+            user32.GetClipboardData.restype = ctypes.c_void_p
+            user32.GetClipboardData.argtypes = [ctypes.c_uint]
+            kernel32.GlobalLock.restype = ctypes.c_void_p
+            kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+            kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+
+            if not user32.OpenClipboard(None):
+                return None
+            h_data = user32.GetClipboardData(CF_UNICODETEXT)
+            text = None
+            if h_data:
+                p_data = kernel32.GlobalLock(h_data)
+                if p_data:
+                    text = ctypes.c_wchar_p(p_data).value
+                    kernel32.GlobalUnlock(h_data)
+            user32.CloseClipboard()
+            return text
+        except Exception:
+            return None
 
     def set_clipboard(self, text: str) -> bool:
-        # Try PySide6 clipboard first
+        # Try PySide6 clipboard first if QApplication exists
         try:
             from PySide6.QtGui import QGuiApplication
-            clip = QGuiApplication.clipboard()
-            if clip:
-                clip.setText(text)
-                return True
+            if QGuiApplication.instance():
+                clip = QGuiApplication.clipboard()
+                if clip:
+                    clip.setText(text)
+                    return True
         except Exception:
             pass
 
         # Native Win32 OpenClipboard fallback
         try:
             import ctypes
-            from ctypes import wintypes
             CF_UNICODETEXT = 13
             user32 = ctypes.windll.user32
             kernel32 = ctypes.windll.kernel32
+
+            kernel32.GlobalAlloc.restype = ctypes.c_void_p
+            kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+            kernel32.GlobalLock.restype = ctypes.c_void_p
+            kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+            kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+            user32.OpenClipboard.argtypes = [ctypes.c_void_p]
+            user32.SetClipboardData.restype = ctypes.c_void_p
+            user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
 
             if not user32.OpenClipboard(None):
                 return False
@@ -186,9 +221,10 @@ class WindowsInjector(BaseInjector):
             h_mem = kernel32.GlobalAlloc(0x0042, len(encoded))  # GMEM_MOVEABLE | GMEM_ZEROINIT
             if h_mem:
                 p_mem = kernel32.GlobalLock(h_mem)
-                ctypes.memmove(p_mem, encoded, len(encoded))
-                kernel32.GlobalUnlock(h_mem)
-                user32.SetClipboardData(CF_UNICODETEXT, h_mem)
+                if p_mem:
+                    ctypes.memmove(p_mem, encoded, len(encoded))
+                    kernel32.GlobalUnlock(h_mem)
+                    user32.SetClipboardData(CF_UNICODETEXT, h_mem)
             user32.CloseClipboard()
             return True
         except Exception as e:

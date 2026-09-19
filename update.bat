@@ -4,6 +4,8 @@ REM Talk-to-Write: One-Click Windows Update Script
 REM Pulls latest changes from Git, updates dependencies, and refreshes shortcut.
 REM ==============================================================================
 
+cd /d "%~dp0"
+
 echo ======================================================
 echo Talk-to-Write Windows Guncelleme Araci
 echo ======================================================
@@ -27,9 +29,9 @@ if %errorlevel% neq 0 (
 if exist ".venv\Scripts\activate.bat" (
     echo [BILGI] Bagimliliklar guncelleniyor...
     call .venv\Scripts\activate.bat
-    pip install -r requirements.txt
-    pip install -e . --no-deps
-    python -m talk_to_write --install
+    call python -m pip install -r requirements.txt
+    call python -m pip install -e . --no-deps
+    call python -m talk_to_write --install
 ) else (
     echo [BILGI] Sanal ortam bulunamadi, tam kurulum calistiriliyor...
     call install.bat
