@@ -13,10 +13,16 @@ from typing import Optional
 
 def get_project_root() -> Path:
     """Returns the absolute root directory of the talk-to-write project."""
+    if getattr(sys, "frozen", False):
+        if hasattr(sys, "_MEIPASS"):
+            return Path(sys._MEIPASS)
+        return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent.parent
 
 def get_launcher_path() -> Path:
     """Finds the primary executable or shell launcher."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve()
     root = get_project_root()
     if sys.platform.startswith("win"):
         bat_launcher = root / "bin" / "talk-to-write.bat"
@@ -148,6 +154,23 @@ def _get_windows_desktop_dir() -> Optional[Path]:
         return desktop
     return None
 
+def attach_windows_console() -> None:
+    """
+    On Windows, attaches to the parent console if invoked with CLI arguments
+    from cmd or PowerShell, so output (help, install, status) is visible.
+    """
+    if not sys.platform.startswith("win"):
+        return
+
+    try:
+        import ctypes
+        # ATTACH_PARENT_PROCESS = -1
+        if ctypes.windll.kernel32.AttachConsole(-1):
+            sys.stdout = open("CONOUT$", "w", encoding="utf-8")
+            sys.stderr = open("CONOUT$", "w", encoding="utf-8")
+    except Exception:
+        pass
+
 def detach_windows_console() -> None:
     """
     On Windows, detaches and hides any console window attached to this process.
@@ -190,6 +213,8 @@ def _ensure_windows_ico() -> Optional[Path]:
     ico_path = root / "assets" / "talk-to-write.ico"
     if ico_path.exists():
         return ico_path
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve()
     png_path = root / "assets" / "talk-to-write-256.png"
     if png_path.exists():
         try:
@@ -208,6 +233,9 @@ def _get_windows_gui_launcher() -> tuple[Path, str]:
     silently without a console window on Windows.
     Prefers pythonw.exe so no terminal/command prompt window ever appears.
     """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve(), ""
+
     root = get_project_root()
     # 1. Check if GUI executable exists (compiled by pip gui-scripts)
     gui_exe = root / ".venv" / "Scripts" / "talk-to-write-gui.exe"

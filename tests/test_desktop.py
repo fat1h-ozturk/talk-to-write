@@ -98,7 +98,7 @@ def test_single_instance_ipc(tmp_path):
     toggle_called = []
     notify_called = []
 
-    with patch("talk_to_write.hotkey.SOCKET_PATH", test_sock):
+    with patch("talk_to_write.hotkey.SOCKET_PATH", test_sock), patch("talk_to_write.hotkey.TCP_PORT", 59123):
         # Server not running yet
         assert not is_instance_running()
 

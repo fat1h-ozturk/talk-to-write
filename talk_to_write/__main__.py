@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication
 from . import __version__
 from .app import TalkToWriteApp
 from .desktop import (
+    attach_windows_console,
     detach_windows_console,
     ensure_desktop_installed,
     get_project_root,
@@ -29,6 +30,9 @@ from .hotkey import (
 )
 
 def main():
+    if len(sys.argv) > 1:
+        attach_windows_console()
+
     parser = argparse.ArgumentParser(
         prog="talk-to-write",
         description="Talk-to-Write: Ultra-fast AI voice dictation desktop assistant."

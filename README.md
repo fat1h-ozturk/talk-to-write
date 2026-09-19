@@ -143,6 +143,12 @@ Uygulamayı, Başlat Menüsü/Başlangıç kısayollarını, ayarları ve sanal 
   uninstall.bat
   ```
 *(İsteğe bağlı olarak proje klasörünü de tamamen silmek isteyip istemediğinizi sorar).*
+
+### 6. 📦 Python Olmadan Bağımsız Çalıştırma (Standalone .exe)
+Eğer uygulamayı Python kurulu olmayan başka bir Windows bilgisayara taşımak veya tek bir `.exe` olarak kullanmak isterseniz:
+- Klasördeki **`build_exe.bat`** dosyasına çift tıklayın.
+- Derleme bittiğinde **`dist\Talk-to-Write.exe`** dosyası oluşturulacaktır (~52 MB).
+- Bu `.exe` dosyasını herhangi bir Windows bilgisayara kopyalayıp Python yüklemeden doğrudan çalıştırabilirsiniz!
 </details>
 
 <details>
