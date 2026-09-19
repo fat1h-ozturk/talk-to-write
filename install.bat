@@ -71,11 +71,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [BILGI] Baslat Menusune kisayol ekleniyor...
+echo [BILGI] Baslat Menusune ve Masaustune kisayol ekleniyor...
 call python -m talk_to_write --install
 
 echo ======================================================
 echo Kurulum Tamamlandi!
-echo Baslat Menusunden "Talk-to-Write" yazarak uygulamayi acabilirsiniz.
+echo Baslat Menusunden veya Masaustundeki "Talk-to-Write" simgesinden uygulamayi acabilirsiniz.
 echo ======================================================
 pause

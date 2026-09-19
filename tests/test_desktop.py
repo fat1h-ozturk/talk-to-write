@@ -130,3 +130,8 @@ def test_single_instance_ipc(tmp_path):
             assert len(toggle_called) == 1
         finally:
             mgr.stop()
+
+def test_detach_windows_console():
+    from talk_to_write.desktop import detach_windows_console
+    # Should not throw any exception regardless of platform
+    detach_windows_console()

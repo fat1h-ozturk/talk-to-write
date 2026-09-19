@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication
 from . import __version__
 from .app import TalkToWriteApp
 from .desktop import (
+    detach_windows_console,
     ensure_desktop_installed,
     get_project_root,
     install_desktop_entry,
@@ -156,6 +157,9 @@ def main():
         print("[Talk-to-Write] Talk-to-Write zaten arka planda çalışıyor.")
         print("  Dikteyi başlatmak için kısayolunuzu (Ctrl+Alt+Space) veya '--toggle' komutunu kullanabilirsiniz.")
         sys.exit(0)
+
+    # Detach any console window on Windows so GUI runs silently in the background
+    detach_windows_console()
 
     # Auto-register desktop entry on first GUI run
     ensure_desktop_installed()

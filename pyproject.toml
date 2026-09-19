@@ -22,5 +22,8 @@ dependencies = [
 [project.scripts]
 talk-to-write = "talk_to_write.__main__:main"
 
+[project.gui-scripts]
+talk-to-write-gui = "talk_to_write.__main__:main"
+
 [tool.setuptools.packages.find]
 include = ["talk_to_write*"]

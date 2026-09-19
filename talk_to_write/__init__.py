@@ -8,12 +8,24 @@ __version__ = "0.2.0"
 import sys
 
 if sys.platform.startswith("win"):
-    if hasattr(sys.stdout, "reconfigure"):
+    import os
+    if sys.stdout is None:
+        try:
+            sys.stdout = open(os.devnull, "w", encoding="utf-8")
+        except Exception:
+            pass
+    elif hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
             pass
-    if hasattr(sys.stderr, "reconfigure"):
+
+    if sys.stderr is None:
+        try:
+            sys.stderr = open(os.devnull, "w", encoding="utf-8")
+        except Exception:
+            pass
+    elif hasattr(sys.stderr, "reconfigure"):
         try:
             sys.stderr.reconfigure(encoding="utf-8", errors="replace")
         except Exception:

@@ -5,9 +5,13 @@ setlocal
 set "DIR=%~dp0.."
 
 if "%~1"=="" (
+    if exist "%DIR%\.venv\Scripts\talk-to-write-gui.exe" (
+        start "" /d "%DIR%" "%DIR%\.venv\Scripts\talk-to-write-gui.exe"
+        exit 0
+    )
     if exist "%DIR%\.venv\Scripts\pythonw.exe" (
-        start "" "%DIR%\.venv\Scripts\pythonw.exe" -m talk_to_write
-        exit /b 0
+        start "" /d "%DIR%" "%DIR%\.venv\Scripts\pythonw.exe" -m talk_to_write
+        exit 0
     )
 )
 

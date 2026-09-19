@@ -139,6 +139,51 @@ def _get_windows_startup_dir() -> Optional[Path]:
         return None
     return programs / "Startup"
 
+def _get_windows_desktop_dir() -> Optional[Path]:
+    userprofile = os.environ.get("USERPROFILE")
+    if not userprofile:
+        return None
+    desktop = Path(userprofile) / "Desktop"
+    if desktop.exists():
+        return desktop
+    return None
+
+def detach_windows_console() -> None:
+    """
+    On Windows, detaches and hides any console window attached to this process.
+    Guarantees that even if launched via python.exe, cmd.exe, or a batch file,
+    the terminal window closes immediately and the application runs silently
+    in the background.
+    """
+    if not sys.platform.startswith("win"):
+        return
+
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        user32 = ctypes.windll.user32
+
+        hwnd = kernel32.GetConsoleWindow()
+        if hwnd:
+            # 0 = SW_HIDE: immediately hide the console window
+            user32.ShowWindow(hwnd, 0)
+            # Detach this process from the console
+            kernel32.FreeConsole()
+
+        # Safely redirect standard streams to devnull
+        if sys.stdout is None or not hasattr(sys.stdout, "closed") or not sys.stdout.closed:
+            try:
+                sys.stdout = open(os.devnull, "w", encoding="utf-8")
+            except Exception:
+                pass
+        if sys.stderr is None or not hasattr(sys.stderr, "closed") or not sys.stderr.closed:
+            try:
+                sys.stderr = open(os.devnull, "w", encoding="utf-8")
+            except Exception:
+                pass
+    except Exception:
+        pass
+
 def _ensure_windows_ico() -> Optional[Path]:
     """Ensures a Windows .ico icon exists in assets/ directory."""
     root = get_project_root()
@@ -164,17 +209,22 @@ def _get_windows_gui_launcher() -> tuple[Path, str]:
     Prefers pythonw.exe so no terminal/command prompt window ever appears.
     """
     root = get_project_root()
-    # 1. Prefer pythonw.exe in project .venv
+    # 1. Check if GUI executable exists (compiled by pip gui-scripts)
+    gui_exe = root / ".venv" / "Scripts" / "talk-to-write-gui.exe"
+    if gui_exe.exists():
+        return gui_exe.resolve(), ""
+
+    # 2. Prefer pythonw.exe in project .venv
     venv_pythonw = root / ".venv" / "Scripts" / "pythonw.exe"
     if venv_pythonw.exists():
         return venv_pythonw.resolve(), "-m talk_to_write"
 
-    # 2. Check current interpreter's pythonw.exe
+    # 3. Check current interpreter's pythonw.exe
     curr_pythonw = Path(sys.executable).parent / "pythonw.exe"
     if curr_pythonw.exists():
         return curr_pythonw.resolve(), "-m talk_to_write"
 
-    # 3. Fallback to bat launcher
+    # 4. Fallback to bat launcher
     bat_launcher = root / "bin" / "talk-to-write.bat"
     if bat_launcher.exists():
         return bat_launcher.resolve(), ""
@@ -191,16 +241,20 @@ def _create_windows_shortcut(
 ) -> bool:
     """Creates a Windows .lnk shortcut using PowerShell."""
     shortcut_path.parent.mkdir(parents=True, exist_ok=True)
+    if shortcut_path.exists():
+        try:
+            shortcut_path.unlink()
+        except Exception:
+            pass
     w_dir = working_dir if working_dir else target.parent
     ps_lines = [
         "$ws = New-Object -ComObject WScript.Shell;",
         f"$s = $ws.CreateShortcut('{str(shortcut_path)}');",
         f"$s.TargetPath = '{str(target)}';",
         f"$s.WorkingDirectory = '{str(w_dir)}';",
+        f"$s.Arguments = '{arguments}';",
         f"$s.Description = '{description}';",
     ]
-    if arguments:
-        ps_lines.append(f"$s.Arguments = '{arguments}';")
     if icon_path and icon_path.exists():
         ps_lines.append(f"$s.IconLocation = '{str(icon_path)}';")
     ps_lines.append("$s.Save()")
@@ -310,7 +364,7 @@ def install_desktop_entry() -> bool:
             launcher, args = _get_windows_gui_launcher()
             root = get_project_root()
             ico = _ensure_windows_ico()
-            return _create_windows_shortcut(
+            res = _create_windows_shortcut(
                 launcher,
                 programs / "Talk-to-Write.lnk",
                 arguments=args,
@@ -318,6 +372,21 @@ def install_desktop_entry() -> bool:
                 icon_path=ico,
                 description="Talk-to-Write: Sesli Dikte Asistanı"
             )
+            # Also create a shortcut on user's Desktop for convenient 1-click access
+            desktop_dir = _get_windows_desktop_dir()
+            if desktop_dir:
+                try:
+                    _create_windows_shortcut(
+                        launcher,
+                        desktop_dir / "Talk-to-Write.lnk",
+                        arguments=args,
+                        working_dir=root,
+                        icon_path=ico,
+                        description="Talk-to-Write: Sesli Dikte Asistanı"
+                    )
+                except Exception:
+                    pass
+            return res
         elif sys.platform.startswith("darwin"):
             return _install_mac_app()
         else:
@@ -344,6 +413,9 @@ def uninstall_desktop_entry() -> bool:
             programs = _get_windows_programs_dir()
             if programs and (programs / "Talk-to-Write.lnk").exists():
                 (programs / "Talk-to-Write.lnk").unlink()
+            desktop_dir = _get_windows_desktop_dir()
+            if desktop_dir and (desktop_dir / "Talk-to-Write.lnk").exists():
+                (desktop_dir / "Talk-to-Write.lnk").unlink()
             return True
         elif sys.platform.startswith("darwin"):
             return _uninstall_mac_app()
